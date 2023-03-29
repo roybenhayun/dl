@@ -33,10 +33,10 @@ def my_sampler(size, dist, requires_grad=False):
     sigma_n = sigma_dist_t_i[-1]
 
     t_zeros = torch.where(probs_samples_flat < p0, True, False)
-    t_ns = torch.where(probs_samples_flat >= sigma_n, True, False)
+    t_ns = torch.where(probs_samples_flat >= sigma_n, True, False)  # NOTE: part of the algorithm, but seems redundant in the context of the MAMAN question
 
     # print("t_zeros: ", t_zeros)
-    print("t_ns: ", torch.any(t_ns))
+    print("t_ns has effect?: ", torch.any(t_ns))
 
     out  = probs_samples_flat.clone()
     for i in range(len(dist) - 1):  # equivalent to ignoring the last sigma_dist_t_i which is '1'
@@ -75,9 +75,9 @@ def render_histogram(A, dist):
     ax.set_ylim([0, A.numel()])
     plt.xticks(range(0, len(dist)))
 
-    plt.xlabel('X-Axis')
-    plt.ylabel('Y-Axis')
-    plt.title(f'dist: {dist}, samples: {A.numel()}', fontweight="bold")
+    plt.xlabel('values')
+    plt.ylabel('number of samples')
+    plt.title(f' values: {[f"{i}" for i in range(0, len(dist))]}, dist: {dist}, samples: {A.numel()}', fontweight="bold")
     plt.show()
 
 
