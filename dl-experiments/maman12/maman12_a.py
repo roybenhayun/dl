@@ -1,6 +1,9 @@
 import torch
 from math import fsum
 
+import numpy as np
+import matplotlib.pyplot as plt
+
 
 def my_sampler(size, dist, requires_grad=False):
     # test sum of probabilities is 1
@@ -27,12 +30,13 @@ def my_sampler(size, dist, requires_grad=False):
     # print("probs_samples: ", probs_samples)
     # print("probs_samples_flat: ", probs_samples_flat)
     p0 = dist_t[0]
-    sigma_n = sigma_dist_t_i[sigma_dist_t_i.numel()-1]
+    sigma_n = sigma_dist_t_i[-1]
 
     t_zeros = torch.where(probs_samples_flat < p0, True, False)
     t_ns = torch.where(probs_samples_flat >= sigma_n, True, False)
+
     # print("t_zeros: ", t_zeros)
-    # print("t_ns: ", t_ns)
+    print("t_ns: ", torch.any(t_ns))
 
     out  = probs_samples_flat.clone()
     for i in range(len(dist) - 1):  # equivalent to ignoring the last sigma_dist_t_i which is '1'
@@ -58,16 +62,38 @@ def my_sampler(size, dist, requires_grad=False):
 
 
 
+def render_10k_samples():
+    dist = [0.1, 0.2, 0.7]
+    A = my_sampler(10000, dist, requires_grad=False)
+    print(A, A.grad, sep='\n')
+    render_histogram(A, dist)
+
+
+def render_histogram(A, dist):
+    n, bins, patches = plt.hist(np.asarray(A.storage()), len(dist))
+    ax = plt.gca()
+    ax.set_ylim([0, A.numel()])
+    plt.xticks(range(0, len(dist)))
+
+    plt.xlabel('X-Axis')
+    plt.ylabel('Y-Axis')
+    plt.title(f'dist: {dist}, samples: {A.numel()}', fontweight="bold")
+    plt.show()
+
 
 if __name__ == '__main__':
+    render_10k_samples()
     print("-----------------------------")
-    ret = my_sampler(10, [0.5, 0.5])
-    print("ret: ", ret)
+    A = my_sampler(10, [0.5, 0.5])
+    print(A, A.grad, sep='\n')
+    render_histogram(A, [0.5, 0.5])
     print("-----------------------------")
 
     print("\n-----------------------------")
-    A = my_sampler((2, 8), [0.3, 0.3, 0.4], requires_grad=False)
+
+    A = my_sampler((2, 8), [0.1, 0.3, 0.6], requires_grad=False)
     print(A, A.grad, sep='\n')
+    render_histogram(A, [0.1, 0.3, 0.6])
     print("-----------------------------")
 
     print("-----------------------------")
