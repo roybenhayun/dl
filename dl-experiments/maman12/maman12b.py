@@ -23,16 +23,24 @@ def exp(a) -> MyScalar:
     return out
 
 
-def ln_a(scalar) -> MyScalar:
-    pass
+def ln(a) -> MyScalar:
+    t = torch.log(torch.Tensor([a.value]))
+    out = MyScalar(t.item(), 1 / a.value, a)
+    return out
 
 
-def sin_a(scalar) -> MyScalar:
-    pass
+def sin(a) -> MyScalar:
+    from math import cos
+    t = torch.sin(torch.Tensor([a.value]))
+    out = MyScalar(t.item(), cos(a.value), a)
+    return out
 
 
-def cos_a(scalar) -> MyScalar:
-    pass
+def cos(a) -> MyScalar:
+    from math import sin
+    t = torch.cos(torch.Tensor([a.value]))
+    out = MyScalar(t.item(), -sin(a.value), a)
+    return out
 
 
 def power(a, b) -> MyScalar:
@@ -42,12 +50,16 @@ def power(a, b) -> MyScalar:
 
 
 
-def n_times_a(scalar) -> MyScalar:
-    pass
+def mul(a, b) -> MyScalar:
+    t = torch.mul(torch.Tensor([a.value]), torch.Tensor([b]))
+    out = MyScalar(t.item(), b, a)
+    return out
 
 
-def a_plus_n(scalar) -> MyScalar:
-    pass
+def add(a, b) -> MyScalar:
+    t = torch.add(torch.Tensor([a.value]), torch.Tensor([b]))
+    out = MyScalar(t.item(), 1, a)
+    return out
 
 
 #
