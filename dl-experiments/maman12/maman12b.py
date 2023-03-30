@@ -81,9 +81,6 @@ def __traverse_computational_graph(scalar, ext, dict) -> float:
 
 
 def get_gradient(scalar) -> dict:
-    '''
-    apply the Chain Rule
-    '''
     dict = {}
     __traverse_computational_graph(scalar, 1, dict)
     print("dict ", dict)
@@ -115,3 +112,7 @@ if __name__ == '__main__':
     print("b.grad: ", d[b])  # 54.598150033144
     print("c.grad: ", d[c])  # 1
 
+    assert d[a] == ta.grad
+    assert d[b] == tb.grad
+    assert d[c] == tc.grad
+    print("PASS")
