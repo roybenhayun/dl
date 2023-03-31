@@ -44,27 +44,41 @@ def alias_draw(J, q):
 
     # Draw from the binary mixture, either keeping the
     # small one, or choosing the associated larger one.
-    if npr.rand() < q[kk]:
+    dice2 = npr.rand()
+    if dice2 < q[kk]:
         return kk
     else:
         return J[kk]
 
-K = 5
-N = 1000
+K = 3
+N = 10
 
 # Get a random probability vector.
 probs = npr.dirichlet(np.ones(K), 1).ravel()
+print("probs: ", probs)
 
 # Construct the table.
 J, q = alias_setup(probs)
+print("J: ", J)
+print("k: ", q)
 
 # Generate variates.
 X = np.zeros(N)
 for nn in range(N):
     X[nn] = alias_draw(J, q)
 
-
 import matplotlib.pyplot as plt
+
+def render_histogram_torch(A, dist):
+    n, bins, patches = plt.hist(np.asarray(A.storage()), len(dist))
+    ax = plt.gca()
+    ax.set_ylim([0, A.numel()])
+    plt.xticks(range(0, len(dist)))
+
+    plt.xlabel('values')
+    plt.ylabel('number of samples')
+    plt.title(f' values: {[f"{i}" for i in range(0, len(dist))]}, dist: {[f"{round(d, 2)}" for d in dist]}, samples: {A.numel()}', fontweight="bold")
+    plt.show()
 
 def render_histogram(A, dist):
     n, bins, patches = plt.hist(np.asarray(A), len(dist))
@@ -78,3 +92,33 @@ def render_histogram(A, dist):
     plt.show()
 
 render_histogram(X, probs)
+
+
+
+#
+# torch
+#
+
+import torch
+
+dist = probs
+print("dist: ", dist)
+kk_samples = torch.randint(low=0, high=K, size=(N,))        # 0/1/2
+kk_samples_flat = torch.reshape(kk_samples, (1, N))
+dice2_samples = torch.rand(size=(N, ))                              # 0.xxx
+dice2_samples_flat = torch.reshape(dice2_samples, (1, N))
+
+# K = len(J)                            # 3
+# kk = int(np.floor(npr.rand() * K))    # 0/1/2
+# dice2 = npr.rand()                    # 0.xxx
+# if dice2 < q[kk]:                     # q[0/1/2] = 0.yyy
+#     return kk                         # kk = 0/1/2
+# else:
+#     return J[kk]                      # J[kk] = 0/1/2
+A = kk_samples_flat.clone()
+for i in range(K):
+    tensor_q = torch.ones(size=(1, N)) * q[i]
+    mask_override_dice2 = torch.where(dice2_samples_flat < tensor_q, True, False)
+    A = torch.where(mask_override_dice2 == True, i, A)
+
+render_histogram_torch(A, dist)
