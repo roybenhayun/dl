@@ -36,16 +36,29 @@ def alias_setup(probs):
 
     return J, q
 
-def alias_draw(J, q):
+kk_arr = [0, 1, 1, 2, 2, 1, 2, 2, 2, 1]
+height_arr = [0.6284530449295839,
+ 0.7508719449781908,
+ 0.7041699036208704,
+ 0.7896240197856693,
+ 0.5067288555329683,
+ 0.641978371417618,
+ 0.47726097537358003,
+ 0.5516907834153594,
+ 0.7235518837358279,
+ 0.7187565292938165]
+
+def alias_draw(J, q, nn):
     K  = len(J)
 
-    # Draw from the overall uniform mixture.
-    kk = int(np.floor(npr.rand()*K))
+    # kk = int(np.floor(npr.rand()*K))    # Draw from the overall uniform mixture.
+    # height = npr.rand()                 # small one, or choosing the associated larger one.
+    # kk_arr.append(kk)
+    # height_arr.append(height)
+    kk = kk_arr[nn]
+    height = height_arr[nn]
 
-    # Draw from the binary mixture, either keeping the
-    # small one, or choosing the associated larger one.
-    dice2 = npr.rand()
-    if dice2 < q[kk]:
+    if height < q[kk]:
         return kk
     else:
         return J[kk]
@@ -59,14 +72,21 @@ print("probs: ", probs)
 
 # Construct the table.
 J, q = alias_setup(probs)
+probs = [0.19, 0.73, 0.08]
+J = [1, 0, 1]
+q = [0.89235835, 1.,         0.55670321]
+
 print("J: ", J)
 print("k: ", q)
+print("kk_arr: ", kk_arr)
+print("height_arr: ", height_arr)
 
 # Generate variates.
 X = np.zeros(N)
 for nn in range(N):
-    X[nn] = alias_draw(J, q)
+    X[nn] = alias_draw(J, q, nn)
 
+print("X: ", X)
 import matplotlib.pyplot as plt
 
 def render_histogram_torch(A, dist):
@@ -103,10 +123,13 @@ import torch
 
 dist = probs
 print("dist: ", dist)
-kk_samples = torch.randint(low=0, high=K, size=(N,))        # 0/1/2
-kk_samples_flat = torch.reshape(kk_samples, (1, N))
-dice2_samples = torch.rand(size=(N, ))                              # 0.xxx
-dice2_samples_flat = torch.reshape(dice2_samples, (1, N))
+
+# Jkk_samples = torch.randint(low=0, high=K, size=(N,))        # 0/1/2
+# height_samples = torch.rand(size=(N,))                              # 0.xxx
+Jkk_samples = torch.tensor(kk_arr)
+height_samples = torch.tensor(height_arr)
+Jkk_samples_flat = torch.reshape(Jkk_samples, (1, N))
+height_samples_flat = torch.reshape(height_samples, (1, N))
 
 # K = len(J)                            # 3
 # kk = int(np.floor(npr.rand() * K))    # 0/1/2
@@ -115,10 +138,19 @@ dice2_samples_flat = torch.reshape(dice2_samples, (1, N))
 #     return kk                         # kk = 0/1/2
 # else:
 #     return J[kk]                      # J[kk] = 0/1/2
-A = kk_samples_flat.clone()
-for i in range(K):
-    tensor_q = torch.ones(size=(1, N)) * q[i]
-    mask_override_dice2 = torch.where(dice2_samples_flat < tensor_q, True, False)
-    A = torch.where(mask_override_dice2 == True, i, A)
+A = Jkk_samples_flat.clone()
+B = height_samples_flat.clone()
+Al = A.long()
+tJ = torch.tensor(J)
+C = torch.tensor(tJ[Al])
+tq = torch.tensor(q)
+D = torch.tensor(tq[Al])
+E = torch.where(B < D, A, C)
+# for i in range(K):
+#     mask_kk = torch.where(A == i, True, False)
+#     mask_height = torch.where(height_samples_flat < q[i], True, False)
+#     mask = mask_kk & mask_height
+#     A = torch.where(mask, A, i)
 
-render_histogram_torch(A, dist)
+
+render_histogram_torch(E, dist)
