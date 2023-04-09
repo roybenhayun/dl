@@ -117,28 +117,61 @@ print(f"last row: {diabetes_ds[-1]}")
 
 ds_loader = DataLoader(diabetes_ds, batch_size=10, shuffle=False)
 
+for features, labels in ds_loader:
+    print(f"{features}, {labels}")
+
+ds_iter = iter(ds_loader)
+enumerator = enumerate(ds_iter)
+for batch_idx, (features, labels) in enumerator:
+    print(f"{batch_idx}, {features}, {labels}")
+
 # iterable
 ds_iter = iter(ds_loader)
 print(f"batch_train_features: {ds_iter}")
 batch_features, batch_labels = next(ds_iter)
 print(batch_features, batch_labels)
 
-for features, labels in ds_loader:
-    print(f"{features}, {labels}")
 
-enumerator = enumerate(ds_iter)
-for batch_idx, (features, labels) in enumerator:
-    print(f"{batch_idx}, {features}, {labels}")
+# 1-8
+
+from torch import nn
+
+model = nn.Sequential(nn.Linear(10, 10, dtype=float), nn.LogSoftmax())
+print(model)
+CE_loss = nn.NLLLoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
 
 
-#print(labels)
+def iterate_batch(input_tensor, labels):
+    optimizer.zero_grad()
+    y_model = model(input_tensor)
+    y_model = model(input_tensor.double())  # RuntimeError: expected scalar type Double but found Float
 
-#
-# def iterate_batch(imgs, labels):
-#     """
-#     see pae 59
-#     :param imgs:
-#     :param labels:
-#     :return:
-#     """
-#     pass
+    loss = CE_loss(y_model, labels)  # RuntimeError: expected scalar type Long but found Double
+    loss.backward()
+    optimizer.step()
+
+    predicted_labels = y_model.argmax(dim=1)
+    acc = (predicted_labels == labels).sum() / len(labels)
+    return loss.detach(), acc.detach()
+
+
+train_dataloader = DataLoader(diabetes_ds, batch_size=10, shuffle=True)
+batches = len(train_dataloader)
+loss = torch.zeros(batches)
+acc = torch.zeros(batches)
+for batch_idx, (features, labels) in enumerate(train_dataloader):
+    print(f"{batch_idx}, {features.size()}, {labels.size()}")
+    loss[batch_idx], acc[batch_idx] = iterate_batch(features.float(), labels)
+
+from matplotlib import pyplot as plt
+plt.figure(figsize=(12,4))
+plt.subplot(1,2,1)
+plt.plot(range(batches), loss);
+plt.title("CE loss");
+plt.xlabel("Batch Number");
+plt.subplot(1,2,2)
+plt.plot(range(batches), acc);
+plt.title("Accuracy");
+plt.xlabel("Batch Number");
+plt.show()
