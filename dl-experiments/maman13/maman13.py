@@ -55,7 +55,7 @@ y_df['Decile_rank'] = pd.qcut(y_df['Score'], 10, labels=decile_labels)
 
 # 1D
 # add Class: decile to X
-x_df = pd.DataFrame(X, columns=bunch.feature_names)
+x_df = pd.DataFrame(X, columns=bunch.feature_names)  # NOTE: this X created from sklearn load_diabetes - Y is NOT included
 x_df['Class'] = y_df['Decile_rank']
 
 # test two cases with min and max values in Y
@@ -74,15 +74,21 @@ print(f"x_df[{min_idx_in_y[0][0]}] = \n{x_df.iloc[min_idx_in_y]}")
 class DiabetesDataset(Dataset):
     """
     encapsulates the sklear diabetes dataset
-    see https://pytorch.org/docs/stable/data.html#torch.utils.data.Dataset
+    see
+        https://pytorch.org/docs/stable/data.html#torch.utils.data.Dataset
+        https://pytorch.org/tutorials/beginner/basics/data_tutorial.html for example implementation
     """
 
-    def __init__(self, file):
+    def __init__(self, file, with_y=True):
         """
         load the CSV to Panda frame
         """
         self._csv_df = pd.read_csv(file, sep='\t')
+        self._with_Y = with_y
         # NOTE: Y is last column in CSV
+        decile_labels = [*range(1, 11)]
+        decile_labels.reverse()
+        self._csv_df['Target'] = pd.qcut(pd.DataFrame(self._csv_df, columns=['Y'])['Y'], 10, labels=decile_labels)
 
         def df_to_tensor(df):
             return torch.from_numpy(df.values).float()
@@ -99,22 +105,50 @@ class DiabetesDataset(Dataset):
         """
         fetching a data sample for a given key
         """
-        return self._transform(self._csv_df.iloc[idx, self._csv_df.columns != 'Y']),\
-            self._csv_df.iloc[idx, self._csv_df.columns == 'Y'].item()
+        # TODO: w\wo Y, return Class as Target
+        if self._with_Y:
+            return self._transform(self._csv_df.iloc[idx, self._csv_df.columns != 'Target']),\
+                self._csv_df.iloc[idx, self._csv_df.columns == 'Target'].item()
+        else:
+            return self._transform(self._csv_df.iloc[idx, ~self._csv_df.columns.isin(['Y', 'Target'])]),\
+                self._csv_df.iloc[idx, self._csv_df.columns == 'Target'].item()
 
 
-csv_file = os.path.join(os.path.dirname(__file__), "diabetes.csv")
+csv_file = os.path.join(os.path.dirname(__file__), "diabetes.csv")  # NOTE: Y included in the CSV
 if not os.path.exists(csv_file):
     raise EnvironmentError(f'{csv_file} not found')
-diabetes_ds = DiabetesDataset(csv_file)
-print(f"number of rows: {len(diabetes_ds)}")
-feature, label = diabetes_ds[0]
-print(f"first row: {feature}, {label}")
-print(f"second row: {diabetes_ds[1]}")
-print(f"third row: {diabetes_ds[2]}")
-print(f"last row: {diabetes_ds[441]}")
-print(f"last row: {diabetes_ds[-1]}")
 
+diabetes_ds = DiabetesDataset(csv_file, with_y=False)
+print(f"number of rows: {len(diabetes_ds)}")
+assert len(diabetes_ds) == 442, f"expected 442, got {len(diabetes_ds)}"
+features, target = diabetes_ds[0]
+print(f"first row: features: {features}, size: {features.size()}, target: {target}")
+features, target = diabetes_ds[1]
+print(f"second row: features: {features}, size: {features.size()}, target: {target}")
+features, target = diabetes_ds[2]
+print(f"third row: features: {features}, size: {features.size()}, target: {target}")
+features, target = diabetes_ds[441]
+print(f"last row: features: {features}, size: {features.size()}, target: {target}")
+features, target = diabetes_ds[-1]
+print(f"last row: features: {features}, size: {features.size()}, target: {target}")
+
+diabetes_ds = DiabetesDataset(csv_file, with_y=True)
+print(f"number of rows: {len(diabetes_ds)}")
+assert len(diabetes_ds) == 442, f"expected 442, got {len(diabetes_ds)}"
+features, target = diabetes_ds[0]
+print(f"first row: features: {features}, size: {features.size()}, target: {target}")
+features, target = diabetes_ds[1]
+print(f"second row: features: {features}, size: {features.size()}, target: {target}")
+features, target = diabetes_ds[2]
+print(f"third row: features: {features}, size: {features.size()}, target: {target}")
+features, target = diabetes_ds[441]
+print(f"last row: features: {features}, size: {features.size()}, target: {target}")
+features, target = diabetes_ds[-1]
+print(f"last row: features: {features}, size: {features.size()}, target: {target}")
+
+# 1.6, 1.7
+
+diabetes_ds = DiabetesDataset(csv_file, with_y=True)
 ds_loader = DataLoader(diabetes_ds, batch_size=10, shuffle=False)
 
 for features, labels in ds_loader:
@@ -132,11 +166,14 @@ batch_features, batch_labels = next(ds_iter)
 print(batch_features, batch_labels)
 
 
-# 1-8
+# 1.8 - החוזה את Class על סמך שאר המשתנים
 
 from torch import nn
 
-model = nn.Sequential(nn.Linear(10, 10, dtype=float), nn.LogSoftmax())
+input_tensor_size = 10  # all X parameters, (Y not included)
+output_size = 10  # the labels are the 10 deciles
+model = nn.Sequential(nn.Linear(input_tensor_size, output_size),  # input size, output size
+                      nn.LogSoftmax(dim=1))  # activation on the output column
 print(model)
 CE_loss = nn.NLLLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
@@ -145,9 +182,8 @@ optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
 def iterate_batch(input_tensor, labels):
     optimizer.zero_grad()
     y_model = model(input_tensor)
-    y_model = model(input_tensor.double())  # RuntimeError: expected scalar type Double but found Float
 
-    loss = CE_loss(y_model, labels)  # RuntimeError: expected scalar type Long but found Double
+    loss = CE_loss(y_model, labels.long())
     loss.backward()
     optimizer.step()
 
@@ -156,13 +192,13 @@ def iterate_batch(input_tensor, labels):
     return loss.detach(), acc.detach()
 
 
-train_dataloader = DataLoader(diabetes_ds, batch_size=10, shuffle=True)
+train_dataloader = DataLoader(diabetes_ds, batch_size=10, shuffle=False)
 batches = len(train_dataloader)
 loss = torch.zeros(batches)
 acc = torch.zeros(batches)
 for batch_idx, (features, labels) in enumerate(train_dataloader):
     print(f"{batch_idx}, {features.size()}, {labels.size()}")
-    loss[batch_idx], acc[batch_idx] = iterate_batch(features.float(), labels)
+    loss[batch_idx], acc[batch_idx] = iterate_batch(features, labels)
 
 from matplotlib import pyplot as plt
 plt.figure(figsize=(12,4))
