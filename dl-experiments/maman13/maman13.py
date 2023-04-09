@@ -4,6 +4,7 @@ import numpy as np
 from pandas.core.array_algos import transforms
 from torch.utils.data import Dataset, DataLoader
 import os
+from matplotlib import pyplot as plt
 
 # info on dataset:
 #   https://scikit-learn.org/stable/datasets/toy_dataset.html#diabetes-dataset
@@ -170,8 +171,9 @@ print(batch_features, batch_labels)
 
 from torch import nn
 
-input_tensor_size = 10  # all X parameters, (Y not included)
-output_size = 10  # the labels are the 10 deciles
+include_Y = True
+input_tensor_size = 11 if include_Y else 10  # the labels are the 11 deciles or 10 deciles w\wo Y respectively
+output_size = 10  # number of Target labels
 model = nn.Sequential(nn.Linear(input_tensor_size, output_size),  # input size, output size
                       nn.LogSoftmax(dim=1))  # activation on the output column
 print(model)
@@ -183,7 +185,7 @@ def iterate_batch(input_tensor, labels):
     optimizer.zero_grad()
     y_model = model(input_tensor)
 
-    loss = CE_loss(y_model, labels.long())
+    loss = CE_loss(y_model, labels.long() - 1)  # must accept long, and Target < model output_size
     loss.backward()
     optimizer.step()
 
@@ -191,8 +193,8 @@ def iterate_batch(input_tensor, labels):
     acc = (predicted_labels == labels).sum() / len(labels)
     return loss.detach(), acc.detach()
 
-
-train_dataloader = DataLoader(diabetes_ds, batch_size=10, shuffle=False)
+diabetes_ds = DiabetesDataset(csv_file, with_y=include_Y)
+train_dataloader = DataLoader(diabetes_ds, batch_size=10, shuffle=True)
 batches = len(train_dataloader)
 loss = torch.zeros(batches)
 acc = torch.zeros(batches)
@@ -200,14 +202,19 @@ for batch_idx, (features, labels) in enumerate(train_dataloader):
     print(f"{batch_idx}, {features.size()}, {labels.size()}")
     loss[batch_idx], acc[batch_idx] = iterate_batch(features, labels)
 
-from matplotlib import pyplot as plt
-plt.figure(figsize=(12,4))
-plt.subplot(1,2,1)
-plt.plot(range(batches), loss);
-plt.title("CE loss");
-plt.xlabel("Batch Number");
-plt.subplot(1,2,2)
-plt.plot(range(batches), acc);
-plt.title("Accuracy");
-plt.xlabel("Batch Number");
-plt.show()
+
+
+def render_accuracy_plot(batches, loss, acc):
+    plt.figure(figsize=(12,4))
+    plt.subplot(1,2,1)
+    plt.plot(range(batches), loss);
+    plt.title("CE loss");
+    plt.xlabel("Batch Number");
+    plt.subplot(1,2,2)
+    plt.plot(range(batches), acc);
+    plt.title("Accuracy");
+    plt.xlabel("Batch Number");
+    plt.show()
+
+
+render_accuracy_plot(batches, loss, acc)
