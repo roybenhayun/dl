@@ -1,8 +1,8 @@
 import torch
 import sklearn.datasets as skds
 import numpy as np
-from pandas.core.array_algos import transforms
 from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.dataset import random_split
 import os
 from matplotlib import pyplot as plt
 
@@ -218,3 +218,77 @@ def render_accuracy_plot(batches, loss, acc):
 
 
 render_accuracy_plot(batches, loss, acc)
+
+
+# 1.10
+
+# https://pytorch.org/docs/stable/data.html#torch.utils.data.random_split
+
+
+def render_train_test_accuracy_plot(num_train_batches, train_loss, train_acc,
+                                    num_test_batches, test_loss, test_acc,
+                                    title):
+    plt.figure(figsize=(12,4))
+    plt.subplot(1,2,1)
+    plt.plot(range(num_train_batches), train_loss, label='Train')
+    plt.title("CE loss")
+    plt.xlabel("Batch Number")
+    plt.legend()
+    plt.subplot(1,2,2)
+    plt.plot(range(num_train_batches), train_acc, label='Train')
+    plt.title("Accuracy")
+    plt.xlabel("Batch Number")
+    plt.legend()
+
+    plt.subplot(1,2,1)
+    plt.plot(range(num_test_batches), test_loss, label='Test')
+    plt.title("CE loss")
+    plt.xlabel("Batch Number")
+    plt.legend()
+    #plt.gca().set_xlim([num_train_batches, num_train_batches + num_test_batches])
+    plt.subplot(1,2,2)
+    plt.plot(range(num_test_batches), test_acc, label='Test')
+    plt.title("Accuracy")
+    plt.xlabel("Batch Number")
+    plt.legend()
+    #plt.gca().set_xlim([num_train_batches, num_train_batches + num_test_batches])
+    plt.suptitle(title)
+    plt.show()
+
+
+def get_test_batch_accuracy(input_tensor, labels):
+    """
+    similar operation as iterate_batch() without Gradient calculation and Optimizer operations, for benchmarking only
+    """
+    y_model = model(input_tensor)
+
+    loss = CE_loss(y_model, labels.long() - 1)
+
+    predicted_labels = y_model.argmax(dim=1)
+    acc = (predicted_labels == labels).sum() / len(labels)
+    return loss.detach(), acc.detach()
+
+
+diabetes_ds_wY = DiabetesDataset(csv_file, with_y=True)
+train_set_size = int(len(diabetes_ds) * 0.2)
+test_set_size = len(diabetes_ds) - train_set_size
+subsets_wY = random_split(diabetes_ds, [train_set_size, test_set_size], generator=torch.Generator().manual_seed(42))
+print(f"subsets: {len(subsets_wY[0])}, {len(subsets_wY[1])}")
+
+train_dataloader = DataLoader(subsets_wY[0], batch_size=10, shuffle=False)
+train_set_loss_wY = torch.zeros(len(train_dataloader))
+train_set_acc_wY = torch.zeros(len(train_dataloader))
+for batch_idx, (features, labels) in enumerate(train_dataloader):
+    print(f"{batch_idx}, {features.size()}, {labels.size()}")
+    train_set_loss_wY[batch_idx], train_set_acc_wY[batch_idx] = iterate_batch(features, labels)
+
+test_dataloader = DataLoader(subsets_wY[1], batch_size=10, shuffle=False)
+test_set_loss_wY = torch.zeros(len(test_dataloader))
+test_set_acc_wY = torch.zeros(len(test_dataloader))
+for batch_idx, (features, labels) in enumerate(test_dataloader):
+    print(f"{batch_idx}, {features.size()}, {labels.size()}")
+    test_set_loss_wY[batch_idx], test_set_acc_wY[batch_idx] = iterate_batch(features, labels)
+
+render_train_test_accuracy_plot(len(train_dataloader), train_set_loss_wY, train_set_acc_wY,
+                                len(test_dataloader), test_set_loss_wY, test_set_acc_wY,
+                                "Diabetes with Y")
