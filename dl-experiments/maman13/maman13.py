@@ -119,33 +119,36 @@ csv_file = os.path.join(os.path.dirname(__file__), "diabetes.csv")  # NOTE: Y in
 if not os.path.exists(csv_file):
     raise EnvironmentError(f'{csv_file} not found')
 
-diabetes_ds = DiabetesDataset(csv_file, with_y=False)
-print(f"number of rows: {len(diabetes_ds)}")
-assert len(diabetes_ds) == 442, f"expected 442, got {len(diabetes_ds)}"
-features, target = diabetes_ds[0]
-print(f"first row: features: {features}, size: {features.size()}, target: {target}")
-features, target = diabetes_ds[1]
-print(f"second row: features: {features}, size: {features.size()}, target: {target}")
-features, target = diabetes_ds[2]
-print(f"third row: features: {features}, size: {features.size()}, target: {target}")
-features, target = diabetes_ds[441]
-print(f"last row: features: {features}, size: {features.size()}, target: {target}")
-features, target = diabetes_ds[-1]
-print(f"last row: features: {features}, size: {features.size()}, target: {target}")
 
-diabetes_ds = DiabetesDataset(csv_file, with_y=True)
-print(f"number of rows: {len(diabetes_ds)}")
-assert len(diabetes_ds) == 442, f"expected 442, got {len(diabetes_ds)}"
-features, target = diabetes_ds[0]
-print(f"first row: features: {features}, size: {features.size()}, target: {target}")
-features, target = diabetes_ds[1]
-print(f"second row: features: {features}, size: {features.size()}, target: {target}")
-features, target = diabetes_ds[2]
-print(f"third row: features: {features}, size: {features.size()}, target: {target}")
-features, target = diabetes_ds[441]
-print(f"last row: features: {features}, size: {features.size()}, target: {target}")
-features, target = diabetes_ds[-1]
-print(f"last row: features: {features}, size: {features.size()}, target: {target}")
+def validate_diabetes_ds(ds):
+    print(f"number of rows: {len(ds)}")
+    assert len(ds) == 442, f"expected 442, got {len(ds)}"
+    features, target = ds[0]
+    print(f"first row: features: {features}, size: {features.size()}, target: {target}")
+    features, target = ds[1]
+    print(f"second row: features: {features}, size: {features.size()}, target: {target}")
+    features, target = ds[2]
+    print(f"third row: features: {features}, size: {features.size()}, target: {target}")
+    features, target = ds[441]
+    print(f"last row: features: {features}, size: {features.size()}, target: {target}")
+    features, target = ds[-1]
+    print(f"last row: features: {features}, size: {features.size()}, target: {target}")
+
+    print(f"number of rows: {len(ds)}")
+    assert len(ds) == 442, f"expected 442, got {len(ds)}"
+    features, target = ds[0]
+    print(f"first row: features: {features}, size: {features.size()}, target: {target}")
+    features, target = ds[1]
+    print(f"second row: features: {features}, size: {features.size()}, target: {target}")
+    features, target = ds[2]
+    print(f"third row: features: {features}, size: {features.size()}, target: {target}")
+    features, target = ds[441]
+    print(f"last row: features: {features}, size: {features.size()}, target: {target}")
+    features, target = ds[-1]
+    print(f"last row: features: {features}, size: {features.size()}, target: {target}")
+
+validate_diabetes_ds(DiabetesDataset(csv_file, with_y=False))
+validate_diabetes_ds(DiabetesDataset(csv_file, with_y=True))
 
 # 1.6, 1.7
 
@@ -153,12 +156,14 @@ diabetes_ds = DiabetesDataset(csv_file, with_y=True)
 ds_loader = DataLoader(diabetes_ds, batch_size=10, shuffle=False)
 
 for features, labels in ds_loader:
-    print(f"{features}, {labels}")
+    pass
+    #print(f"{features}, {labels}")
 
 ds_iter = iter(ds_loader)
 enumerator = enumerate(ds_iter)
 for batch_idx, (features, labels) in enumerator:
-    print(f"{batch_idx}, {features}, {labels}")
+    pass
+    #print(f"{batch_idx}, {features}, {labels}")
 
 # iterable
 ds_iter = iter(ds_loader)
@@ -320,3 +325,22 @@ test_set_size = len(diabetes_ds_woY) - train_set_size
 render_train_test_accuracy_plot(* train_and_test_subsets(test_set_size, train_set_size, diabetes_ds_woY),
                                 "Diabetes without Y")
 
+
+
+#
+# 1.11
+#
+
+
+class PercentageDiabetesDataset(DiabetesDataset):
+    def __init__(self, file, with_y=True):
+        super().__init__(file, with_y)
+        # override 'Target' column
+        print("before: ", self._csv_df['Target'])
+        percent_labels = [*range(1, 101)]
+        percent_labels.reverse()
+        self._csv_df['Target'] = pd.qcut(pd.DataFrame(self._csv_df, columns=['Y'])['Y'], 100, percent_labels)
+        print("after: ", self._csv_df['Target'])
+
+validate_diabetes_ds(PercentageDiabetesDataset(csv_file, with_y=False))
+validate_diabetes_ds(PercentageDiabetesDataset(csv_file, with_y=True))
