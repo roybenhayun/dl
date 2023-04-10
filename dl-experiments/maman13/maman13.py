@@ -245,7 +245,7 @@ def render_train_test_accuracy_plot(num_train_batches, train_loss, train_acc,
 
     plt.subplot(1,2,2)
     plt.plot(range(num_train_batches), train_acc, label='train set')
-    plt.title("Accuracy")
+    plt.title("Accuracy", color='orange')
     plt.xlabel("Batch Number")
     plt.legend()
     plt.plot(x2, test_acc, label='test set')
