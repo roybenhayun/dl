@@ -176,15 +176,6 @@ print(batch_features, batch_labels)
 
 from torch import nn
 
-include_Y = True
-input_tensor_size = 11 if include_Y else 10  # the labels are the 11 deciles or 10 deciles w\wo Y respectively
-output_size = 10  # number of Target labels
-model = nn.Sequential(nn.Linear(input_tensor_size, output_size),  # input size, output size
-                      nn.LogSoftmax(dim=1))  # activation on the output column
-print(model)
-CE_loss = nn.NLLLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
-
 
 def iterate_batch(input_tensor, labels):
     optimizer.zero_grad()
@@ -198,18 +189,8 @@ def iterate_batch(input_tensor, labels):
     acc = (predicted_labels == labels).sum() / len(labels)
     return loss.detach(), acc.detach()
 
-diabetes_ds = DiabetesDataset(csv_file, with_y=include_Y)
-train_dataloader = DataLoader(diabetes_ds, batch_size=10, shuffle=True)
-batches = len(train_dataloader)
-loss = torch.zeros(batches)
-acc = torch.zeros(batches)
-for batch_idx, (features, labels) in enumerate(train_dataloader):
-    print(f"{batch_idx}, {features.size()}, {labels.size()}")
-    loss[batch_idx], acc[batch_idx] = iterate_batch(features, labels)
 
-
-
-def render_accuracy_plot(batches, loss, acc):
+def render_accuracy_plot(batches, loss, acc, title):
     plt.figure(figsize=(12,4))
     plt.subplot(1,2,1)
     plt.plot(range(batches), loss);
@@ -217,12 +198,58 @@ def render_accuracy_plot(batches, loss, acc):
     plt.xlabel("Batch Number");
     plt.subplot(1,2,2)
     plt.plot(range(batches), acc);
-    plt.title("Accuracy");
+    avg_acc = round(float(np.average(acc)), 3)
+    plt.title(f"Accuracy (avg: {avg_acc})")
     plt.xlabel("Batch Number");
+    plt.suptitle(title)
     plt.show()
 
+#
+# with Y
+#
 
-render_accuracy_plot(batches, loss, acc)
+include_Y = True
+input_tensor_size = 11 if include_Y else 10  # the labels are the 11 deciles or 10 deciles w\wo Y respectively
+output_size = 10  # number of Target labels
+model = nn.Sequential(nn.Linear(input_tensor_size, output_size),  # input size, output size
+                      nn.LogSoftmax(dim=1))  # activation on the output column
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+CE_loss = nn.NLLLoss()
+print(model)
+
+diabetes_ds_wY = DiabetesDataset(csv_file, with_y=include_Y)
+train_dataloader = DataLoader(diabetes_ds_wY, batch_size=10, shuffle=True)
+batches = len(train_dataloader)
+loss = torch.zeros(batches)
+acc = torch.zeros(batches)
+for batch_idx, (features, labels) in enumerate(train_dataloader):
+    print(f"{batch_idx}, {features.size()}, {labels.size()}")
+    loss[batch_idx], acc[batch_idx] = iterate_batch(features, labels)
+
+render_accuracy_plot(batches, loss, acc, "Diabetes DS, with Y")
+
+#
+# without Y
+#
+
+
+input_tensor_size = 10  # 10 wo Y
+output_size = 10  # number of Target labels
+model = nn.Sequential(nn.Linear(input_tensor_size, output_size), nn.LogSoftmax(dim=1))
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+CE_loss = nn.NLLLoss()
+print(model)
+
+diabetes_ds_woY = DiabetesDataset(csv_file, with_y=False)
+train_dataloader = DataLoader(diabetes_ds_woY, batch_size=10, shuffle=True)
+batches = len(train_dataloader)
+loss = torch.zeros(batches)
+acc = torch.zeros(batches)
+for batch_idx, (features, labels) in enumerate(train_dataloader):
+    print(f"{batch_idx}, {features.size()}, {labels.size()}")
+    loss[batch_idx], acc[batch_idx] = iterate_batch(features, labels)
+
+render_accuracy_plot(batches, loss, acc, "Diabetes DS, without Y")
 
 
 # 1.10
@@ -342,5 +369,47 @@ class PercentageDiabetesDataset(DiabetesDataset):
         self._csv_df['Target'] = pd.qcut(pd.DataFrame(self._csv_df, columns=['Y'])['Y'], 100, percent_labels)
         print("after: ", self._csv_df['Target'])
 
-validate_diabetes_ds(PercentageDiabetesDataset(csv_file, with_y=False))
-validate_diabetes_ds(PercentageDiabetesDataset(csv_file, with_y=True))
+
+diabetes_perc_ds_wY = PercentageDiabetesDataset(csv_file, with_y=True)
+validate_diabetes_ds(diabetes_perc_ds_wY)
+diabetes_perc_ds_woY = PercentageDiabetesDataset(csv_file, with_y=False)
+validate_diabetes_ds(diabetes_perc_ds_woY)
+
+#
+# 1.11 - replay 8-10
+#
+
+
+include_Y = True
+input_tensor_size = 11 if include_Y else 10  # the labels are the 11 deciles or 10 deciles w\wo Y respectively
+output_size = 100  # number of Target labels - 100 percent
+model = nn.Sequential(nn.Linear(input_tensor_size, output_size),  nn.LogSoftmax(dim=1))
+CE_loss = nn.NLLLoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+
+train_dataloader = DataLoader(diabetes_perc_ds_wY, batch_size=10, shuffle=True)
+batches = len(train_dataloader)
+loss = torch.zeros(batches)
+acc = torch.zeros(batches)
+for batch_idx, (features, labels) in enumerate(train_dataloader):
+    print(f"{batch_idx}, {features.size()}, {labels.size()}")
+    loss[batch_idx], acc[batch_idx] = iterate_batch(features, labels)
+
+render_accuracy_plot(batches, loss, acc, "Percentage-Diabetes DS, with Y")
+
+
+model = nn.Sequential(nn.Linear(10, 100),  nn.LogSoftmax(dim=1))
+CE_loss = nn.NLLLoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+
+train_dataloader = DataLoader(diabetes_perc_ds_woY, batch_size=10, shuffle=True)
+batches = len(train_dataloader)
+loss = torch.zeros(batches)
+acc = torch.zeros(batches)
+for batch_idx, (features, labels) in enumerate(train_dataloader):
+    print(f"{batch_idx}, {features.size()}, {labels.size()}")
+    loss[batch_idx], acc[batch_idx] = iterate_batch(features, labels)
+
+render_accuracy_plot(batches, loss, acc, "Percentage-Diabetes DS, without Y")
+
+# 1.14: percentage is too fine-grained accuracy. Deciles is a better option, specific for this scenario and likely to other scenarios
