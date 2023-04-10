@@ -267,26 +267,39 @@ def get_test_batch_accuracy(input_tensor, labels):
     return loss.detach(), acc.detach()
 
 
+def test_and_train_subsets(test_set_size, train_set_size, dataset):
+    subsets = random_split(dataset, [train_set_size, test_set_size])
+    print(f"subsets: {len(subsets[0])}, {len(subsets[1])}")
+
+    train_dataloader = DataLoader(subsets[0], batch_size=10, shuffle=False)
+    train_set_loss = torch.zeros(len(train_dataloader))
+    train_set_acc = torch.zeros(len(train_dataloader))
+    for batch_idx, (features, labels) in enumerate(train_dataloader):
+        print(f"{batch_idx}, {features.size()}, {labels.size()}")
+        train_set_loss[batch_idx], train_set_acc[batch_idx] = iterate_batch(features, labels)
+
+    test_dataloader = DataLoader(subsets[1], batch_size=10, shuffle=False)
+    test_set_loss = torch.zeros(len(test_dataloader))
+    test_set_acc = torch.zeros(len(test_dataloader))
+    for batch_idx, (features, labels) in enumerate(test_dataloader):
+        print(f"{batch_idx}, {features.size()}, {labels.size()}")
+        test_set_loss[batch_idx], test_set_acc[batch_idx] = iterate_batch(features, labels)
+
+    return len(train_dataloader), train_set_loss, train_set_acc, \
+        len(test_dataloader), test_set_loss, test_set_acc
+
+
 diabetes_ds_wY = DiabetesDataset(csv_file, with_y=True)
-train_set_size = int(len(diabetes_ds) * 0.2)
-test_set_size = len(diabetes_ds) - train_set_size
-subsets_wY = random_split(diabetes_ds, [train_set_size, test_set_size], generator=torch.Generator().manual_seed(42))
-print(f"subsets: {len(subsets_wY[0])}, {len(subsets_wY[1])}")
-
-train_dataloader = DataLoader(subsets_wY[0], batch_size=10, shuffle=False)
-train_set_loss_wY = torch.zeros(len(train_dataloader))
-train_set_acc_wY = torch.zeros(len(train_dataloader))
-for batch_idx, (features, labels) in enumerate(train_dataloader):
-    print(f"{batch_idx}, {features.size()}, {labels.size()}")
-    train_set_loss_wY[batch_idx], train_set_acc_wY[batch_idx] = iterate_batch(features, labels)
-
-test_dataloader = DataLoader(subsets_wY[1], batch_size=10, shuffle=False)
-test_set_loss_wY = torch.zeros(len(test_dataloader))
-test_set_acc_wY = torch.zeros(len(test_dataloader))
-for batch_idx, (features, labels) in enumerate(test_dataloader):
-    print(f"{batch_idx}, {features.size()}, {labels.size()}")
-    test_set_loss_wY[batch_idx], test_set_acc_wY[batch_idx] = iterate_batch(features, labels)
-
-render_train_test_accuracy_plot(len(train_dataloader), train_set_loss_wY, train_set_acc_wY,
-                                len(test_dataloader), test_set_loss_wY, test_set_acc_wY,
+model = nn.Sequential(nn.Linear(11, 10), nn.LogSoftmax(dim=1))
+train_set_size = int(len(diabetes_ds_wY) * 0.2)
+test_set_size = len(diabetes_ds_wY) - train_set_size
+render_train_test_accuracy_plot(* test_and_train_subsets(test_set_size, train_set_size, diabetes_ds_wY),
                                 "Diabetes with Y")
+
+diabetes_ds_woY = DiabetesDataset(csv_file, with_y=False)
+model = nn.Sequential(nn.Linear(10, 10), nn.LogSoftmax(dim=1))
+train_set_size = int(len(diabetes_ds_woY) * 0.2)
+test_set_size = len(diabetes_ds_woY) - train_set_size
+render_train_test_accuracy_plot(* test_and_train_subsets(test_set_size, train_set_size, diabetes_ds_woY),
+                                "Diabetes without Y")
+
