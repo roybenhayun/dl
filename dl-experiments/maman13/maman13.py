@@ -236,7 +236,10 @@ def render_train_test_accuracy_plot(num_train_batches, train_loss, train_acc,
     plt.legend()
     x2 = np.arange(num_train_batches, num_test_batches + num_train_batches)
     plt.plot(x2, test_loss, label='test set')
-    plt.title("CE loss")
+    min_test_ce_loss = round(float(test_loss.min()), 3)
+    max_test_ce_loss = round(float(test_loss.max()), 3)
+    avg_test_ce_loss = round(float(np.average(test_loss)), 3)
+    plt.title(f"CE loss (min: {min_test_ce_loss}, max: {max_test_ce_loss}, avg: {avg_test_ce_loss})")
     plt.xlabel("Batch Number")
     plt.legend()
 
@@ -246,10 +249,12 @@ def render_train_test_accuracy_plot(num_train_batches, train_loss, train_acc,
     plt.xlabel("Batch Number")
     plt.legend()
     plt.plot(x2, test_acc, label='test set')
-    plt.title("Accuracy")
+    min_test_acc = round(float(test_acc.min()), 3)
+    max_test_acc = round(float(test_acc.max()), 3)
+    avg_test_acc = round(float(np.average(test_acc)), 3)
+    plt.title(f"Accuracy (min: {min_test_acc}, max: {max_test_acc}, avg: {avg_test_acc})")
     plt.xlabel("Batch Number")
     plt.legend()
-    #plt.gca().set_xlim([num_train_batches, num_train_batches + num_test_batches])
     plt.suptitle(title)
     plt.show()
 
@@ -267,39 +272,51 @@ def get_test_batch_accuracy(input_tensor, labels):
     return loss.detach(), acc.detach()
 
 
-def test_and_train_subsets(test_set_size, train_set_size, dataset):
+def train_and_test_subsets(test_set_size, train_set_size, dataset, num_epochs=20):
     subsets = random_split(dataset, [train_set_size, test_set_size])
-    print(f"subsets: {len(subsets[0])}, {len(subsets[1])}")
+    print(f"train set: {len(subsets[0])}, test set: {len(subsets[1])}")
 
-    train_dataloader = DataLoader(subsets[0], batch_size=10, shuffle=False)
-    train_set_loss = torch.zeros(len(train_dataloader))
-    train_set_acc = torch.zeros(len(train_dataloader))
-    for batch_idx, (features, labels) in enumerate(train_dataloader):
-        print(f"{batch_idx}, {features.size()}, {labels.size()}")
-        train_set_loss[batch_idx], train_set_acc[batch_idx] = iterate_batch(features, labels)
+    train_dataloader = DataLoader(subsets[0], batch_size=10, shuffle=True)
+    train_set_loss = torch.zeros(len(train_dataloader) * num_epochs)
+    train_set_acc = torch.zeros(len(train_dataloader) * num_epochs)
+    print("run train set..")
+    idx = 0
+    for epoch in range(num_epochs):
+        for batch_idx, (features, labels) in enumerate(train_dataloader):
+            train_set_loss[idx], train_set_acc[idx] = iterate_batch(features, labels)
+            idx += 1
+    print(f"avg loss: {round(float(np.average(train_set_loss)), 3)}, avg acc: {round(float(np.average(train_set_acc)), 3)}")
 
-    test_dataloader = DataLoader(subsets[1], batch_size=10, shuffle=False)
+
+    test_dataloader = DataLoader(subsets[1], batch_size=10, shuffle=True)
     test_set_loss = torch.zeros(len(test_dataloader))
     test_set_acc = torch.zeros(len(test_dataloader))
+    print("run test set..")
     for batch_idx, (features, labels) in enumerate(test_dataloader):
-        print(f"{batch_idx}, {features.size()}, {labels.size()}")
-        test_set_loss[batch_idx], test_set_acc[batch_idx] = iterate_batch(features, labels)
+        test_set_loss[batch_idx], test_set_acc[batch_idx] = get_test_batch_accuracy(features, labels)
+    print(f"avg loss: {round(float(np.average(test_set_loss)), 3)}, avg acc: {round(float(np.average(test_set_acc)), 3)}")
 
-    return len(train_dataloader), train_set_loss, train_set_acc, \
+    return len(train_dataloader) * num_epochs, train_set_loss, train_set_acc, \
         len(test_dataloader), test_set_loss, test_set_acc
 
 
+print("train and test, with Y...")
 diabetes_ds_wY = DiabetesDataset(csv_file, with_y=True)
 model = nn.Sequential(nn.Linear(11, 10), nn.LogSoftmax(dim=1))
-train_set_size = int(len(diabetes_ds_wY) * 0.2)
+CE_loss = nn.NLLLoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+train_set_size = int(len(diabetes_ds_wY) * 0.8)
 test_set_size = len(diabetes_ds_wY) - train_set_size
-render_train_test_accuracy_plot(* test_and_train_subsets(test_set_size, train_set_size, diabetes_ds_wY),
+render_train_test_accuracy_plot(* train_and_test_subsets(test_set_size, train_set_size, diabetes_ds_wY),
                                 "Diabetes with Y")
 
+print("train and test, without Y...")
 diabetes_ds_woY = DiabetesDataset(csv_file, with_y=False)
 model = nn.Sequential(nn.Linear(10, 10), nn.LogSoftmax(dim=1))
-train_set_size = int(len(diabetes_ds_woY) * 0.2)
+CE_loss = nn.NLLLoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+train_set_size = int(len(diabetes_ds_woY) * 0.8)
 test_set_size = len(diabetes_ds_woY) - train_set_size
-render_train_test_accuracy_plot(* test_and_train_subsets(test_set_size, train_set_size, diabetes_ds_woY),
+render_train_test_accuracy_plot(* train_and_test_subsets(test_set_size, train_set_size, diabetes_ds_woY),
                                 "Diabetes without Y")
 
