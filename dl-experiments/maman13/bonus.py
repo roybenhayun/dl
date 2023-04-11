@@ -106,8 +106,6 @@ def train_and_test_subsets(test_set_size, train_set_size, dataset, num_epochs):
     min, max = dataset.get_labels_range()
     num_labels = max - min + 1
     model = nn.Sequential(nn.Linear(10, num_labels),
-                          nn.ReLU(),
-                          nn.Linear(num_labels, num_labels),
                           nn.LogSoftmax(dim=1))
     CE_loss = nn.NLLLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
