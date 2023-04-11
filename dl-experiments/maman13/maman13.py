@@ -181,7 +181,7 @@ def iterate_batch(input_tensor, labels):
     optimizer.zero_grad()
     y_model = model(input_tensor)
 
-    loss = CE_loss(y_model, labels.long() - 1)  # must accept long, and Target < model output_size
+    loss = CE_loss(y_model, labels.long() - 1)  # must accept long, and Target < model output_size. Deciles start from 1, so need to shift -1
     loss.backward()
     optimizer.step()
 
@@ -249,7 +249,7 @@ for batch_idx, (features, labels) in enumerate(train_dataloader):
     print(f"{batch_idx}, {features.size()}, {labels.size()}")
     loss[batch_idx], acc[batch_idx] = iterate_batch(features, labels)
 
-render_accuracy_plot(batches, loss, acc, "Diabetes DS, without Y")
+render_accuracy_plot(batches, loss, acc, "Diabetes DS, predict decile, 1 epoch, without Y")
 
 
 # 1.10
@@ -339,8 +339,9 @@ CE_loss = nn.NLLLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
 train_set_size = int(len(diabetes_ds_wY) * 0.8)
 test_set_size = len(diabetes_ds_wY) - train_set_size
-render_train_test_accuracy_plot(* train_and_test_subsets(test_set_size, train_set_size, diabetes_ds_wY),
-                                "Diabetes with Y")
+num_epochs = 20
+render_train_test_accuracy_plot(* train_and_test_subsets(test_set_size, train_set_size, diabetes_ds_wY, num_epochs=num_epochs),
+                                f"Diabetes, predict decile, {num_epochs} epochs, with Y")
 
 print("train and test, without Y...")
 diabetes_ds_woY = DiabetesDataset(csv_file, with_y=False)
@@ -349,8 +350,8 @@ CE_loss = nn.NLLLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
 train_set_size = int(len(diabetes_ds_woY) * 0.8)
 test_set_size = len(diabetes_ds_woY) - train_set_size
-render_train_test_accuracy_plot(* train_and_test_subsets(test_set_size, train_set_size, diabetes_ds_woY),
-                                "Diabetes without Y")
+render_train_test_accuracy_plot(* train_and_test_subsets(test_set_size, train_set_size, diabetes_ds_woY, num_epochs=num_epochs),
+                                f"Diabetes, predict decile, {num_epochs} epochs, without Y")
 
 
 
@@ -395,7 +396,7 @@ for batch_idx, (features, labels) in enumerate(train_dataloader):
     print(f"{batch_idx}, {features.size()}, {labels.size()}")
     loss[batch_idx], acc[batch_idx] = iterate_batch(features, labels)
 
-render_accuracy_plot(batches, loss, acc, "Percentage-Diabetes DS, with Y")
+render_accuracy_plot(batches, loss, acc, "Percentage-Diabetes DS, predict percentage with Y")
 
 
 model = nn.Sequential(nn.Linear(10, 100),  nn.LogSoftmax(dim=1))
@@ -410,6 +411,6 @@ for batch_idx, (features, labels) in enumerate(train_dataloader):
     print(f"{batch_idx}, {features.size()}, {labels.size()}")
     loss[batch_idx], acc[batch_idx] = iterate_batch(features, labels)
 
-render_accuracy_plot(batches, loss, acc, "Percentage-Diabetes DS, without Y")
+render_accuracy_plot(batches, loss, acc, "Percentage-Diabetes DS, predict percentage without Y")
 
 # 1.14: percentage is too fine-grained accuracy. Deciles is a better option, specific for this scenario and likely to other scenarios
