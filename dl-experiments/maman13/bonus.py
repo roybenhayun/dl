@@ -116,6 +116,10 @@ def train_and_test_subsets(test_set_size, train_set_size, dataset, num_epochs):
     train_set_loss = torch.zeros(len(train_dataloader) * num_epochs)
     train_set_acc = torch.zeros(len(train_dataloader) * num_epochs)
     print("run train set..")
+
+    # train model
+    model.train()
+
     idx = 0
     for epoch in tqdm(range(num_epochs), unit="epoch"):
         for batch_idx, (features, labels) in enumerate(train_dataloader):
@@ -123,13 +127,16 @@ def train_and_test_subsets(test_set_size, train_set_size, dataset, num_epochs):
             idx += 1
     print(f"avg loss: {round(float(np.average(train_set_loss)), 3)}, avg acc: {round(float(np.average(train_set_acc)), 3)}")
 
+    # test model
 
     test_dataloader = DataLoader(subsets[1], batch_size=10, shuffle=True)
     test_set_loss = torch.zeros(len(test_dataloader))
     test_set_acc = torch.zeros(len(test_dataloader))
     print("run test set..")
-    for batch_idx, (features, labels) in tqdm(enumerate(test_dataloader), unit="test batch iteration"):
-        test_set_loss[batch_idx], test_set_acc[batch_idx] = get_test_batch_accuracy(features, labels, model, CE_loss)
+    model.eval()
+    with torch.no_grad():
+        for batch_idx, (features, labels) in tqdm(enumerate(test_dataloader), unit="test batch iteration"):
+            test_set_loss[batch_idx], test_set_acc[batch_idx] = get_test_batch_accuracy(features, labels, model, CE_loss)
     print(f"avg loss: {round(float(np.average(test_set_loss)), 3)}, avg acc: {round(float(np.average(test_set_acc)), 3)}")
 
     return len(train_dataloader) * num_epochs, train_set_loss, train_set_acc, \

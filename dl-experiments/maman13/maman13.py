@@ -179,13 +179,22 @@ from torch import nn
 
 def iterate_batch(input_tensor, labels):
     optimizer.zero_grad()
+
+    # forward pass
     y_model = model(input_tensor)
 
+    # compute loss
     loss = CE_loss(y_model, labels.long() - 1)  # must accept long, and Target < model output_size. Deciles start from 1, so need to shift -1
+
+    # backpropagation - backward pass
     loss.backward()
+
+    # update network weights
     optimizer.step()
 
+    # count predicted labels
     predicted_labels = y_model.argmax(dim=1)
+
     acc = (predicted_labels == labels).sum() / len(labels)
     return loss.detach(), acc.detach()
 
@@ -293,20 +302,30 @@ def render_train_test_accuracy_plot(num_train_batches, train_loss, train_acc,
 
 def get_test_batch_accuracy(input_tensor, labels):
     """
-    similar operation as iterate_batch() without Gradient calculation and Optimizer operations, for benchmarking only
+    similar operation as iterate_batch() without Gradient calculation and Optimizer operations, for test evaluation only
     """
+
+    # forward pass
     y_model = model(input_tensor)
 
+    # calculate loss - just for stats, not doing backpropagation.
     loss = CE_loss(y_model, labels.long() - 1)
 
+    # count predicated labels
     predicted_labels = y_model.argmax(dim=1)
-    acc = (predicted_labels == labels).sum() / len(labels)
-    return loss.detach(), acc.detach()
+
+    total_acc = (predicted_labels == labels).sum()
+    acc = total_acc / len(labels)
+    return loss.detach(), acc.detach(), total_acc
 
 
 def train_and_test_subsets(test_set_size, train_set_size, dataset, num_epochs=20):
     subsets = random_split(dataset, [train_set_size, test_set_size])
     print(f"train set: {len(subsets[0])}, test set: {len(subsets[1])}")
+
+    # train model
+
+    model.train()  # switch to training mode
 
     train_dataloader = DataLoader(subsets[0], batch_size=10, shuffle=True)
     train_set_loss = torch.zeros(len(train_dataloader) * num_epochs)
@@ -319,13 +338,19 @@ def train_and_test_subsets(test_set_size, train_set_size, dataset, num_epochs=20
             idx += 1
     print(f"avg loss: {round(float(np.average(train_set_loss)), 3)}, avg acc: {round(float(np.average(train_set_acc)), 3)}")
 
+    # test model
 
     test_dataloader = DataLoader(subsets[1], batch_size=10, shuffle=True)
     test_set_loss = torch.zeros(len(test_dataloader))
     test_set_acc = torch.zeros(len(test_dataloader))
+    total_acc = 0
     print("run test set..")
-    for batch_idx, (features, labels) in enumerate(test_dataloader):
-        test_set_loss[batch_idx], test_set_acc[batch_idx] = get_test_batch_accuracy(features, labels)
+    model.eval()  # switch to evaluation mode
+    with torch.no_grad():
+        for batch_idx, (features, labels) in enumerate(test_dataloader):
+            test_set_loss[batch_idx], test_set_acc[batch_idx], batch_acc = get_test_batch_accuracy(features, labels)
+            total_acc += batch_acc
+
     print(f"avg loss: {round(float(np.average(test_set_loss)), 3)}, avg acc: {round(float(np.average(test_set_acc)), 3)}")
 
     return len(train_dataloader) * num_epochs, train_set_loss, train_set_acc, \
