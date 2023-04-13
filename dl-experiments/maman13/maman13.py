@@ -5,6 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.dataset import random_split
 import os
 from matplotlib import pyplot as plt
+from tqdm import tqdm
 
 # info on dataset:
 #   https://scikit-learn.org/stable/datasets/toy_dataset.html#diabetes-dataset
@@ -332,7 +333,7 @@ def train_and_test_subsets(test_set_size, train_set_size, dataset, num_epochs=20
     train_set_acc = torch.zeros(len(train_dataloader) * num_epochs)
     print("run train set..")
     idx = 0
-    for epoch in range(num_epochs):
+    for epoch in tqdm(range(num_epochs), unit="epoch"):
         for batch_idx, (features, labels) in enumerate(train_dataloader):
             train_set_loss[idx], train_set_acc[idx] = iterate_batch(features, labels)
             idx += 1
@@ -347,7 +348,7 @@ def train_and_test_subsets(test_set_size, train_set_size, dataset, num_epochs=20
     print("run test set..")
     model.eval()  # switch to evaluation mode
     with torch.no_grad():
-        for batch_idx, (features, labels) in enumerate(test_dataloader):
+        for batch_idx, (features, labels) in tqdm(enumerate(test_dataloader), unit="batch"):
             test_set_loss[batch_idx], test_set_acc[batch_idx], batch_acc = get_test_batch_accuracy(features, labels)
             total_acc += batch_acc
 
@@ -364,7 +365,7 @@ CE_loss = nn.NLLLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
 train_set_size = int(len(diabetes_ds_wY) * 0.8)
 test_set_size = len(diabetes_ds_wY) - train_set_size
-num_epochs = 20
+num_epochs = 100
 render_train_test_accuracy_plot(* train_and_test_subsets(test_set_size, train_set_size, diabetes_ds_wY, num_epochs=num_epochs),
                                 f"Diabetes, predict decile, {num_epochs} epochs, with Y")
 

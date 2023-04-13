@@ -104,7 +104,7 @@ def train_and_test_subsets(test_set_size, train_set_size, dataset, num_epochs):
     print(f"train set: {len(subsets[0])}, test set: {len(subsets[1])}")
 
     min, max = dataset.get_labels_range()
-    num_labels = max - min + 1
+    num_labels = max - min + 1  # TODO: the overall Range of Possible target Y values. maybe should limit to Actual values in this dataset?
     model = nn.Sequential(nn.Linear(10, num_labels),
                           nn.LogSoftmax(dim=1))
     CE_loss = nn.NLLLoss()
