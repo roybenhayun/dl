@@ -6,6 +6,8 @@ from torch.utils.data.dataset import random_split
 import os
 from matplotlib import pyplot as plt
 from tqdm import tqdm
+import pandas as pd
+from torch import nn
 
 # info on dataset:
 #   https://scikit-learn.org/stable/datasets/toy_dataset.html#diabetes-dataset
@@ -28,8 +30,6 @@ X, Y = skds.load_diabetes(return_X_y=True)
 # calc the ten deciles
 # see https://www.geeksforgeeks.org/quantile-and-decile-rank-of-a-column-in-pandas-python/
 
-# importing the modules
-import pandas as pd
 
 df = {'Name': ['Amit', 'Darren', 'Cody', 'Drew',
                'Ravi', 'Donald', 'Amy'],
@@ -70,12 +70,33 @@ print(f"x_df[{max_idx_in_y[0][0]}] = \n{x_df.iloc[max_idx_in_y]}")
 print(f"min value in Y: {Y.min()}, in index: {min_idx_in_y}, has 'Class' value: {x_df.iloc[min_idx_in_y].iloc[0]['Class']} in x_df")
 print(f"x_df[{min_idx_in_y[0][0]}] = \n{x_df.iloc[min_idx_in_y]}")
 
+
+# 1D
+csv_url = "https://iot-arch-bucket1.s3.eu-central-1.amazonaws.com/public/diabetes.csv"
+Y = pd.read_csv(csv_url, sep='\t')
+print("CSV loaded: ", Y)
+
+decile_labels = [*range(1, 11)]
+decile_labels.reverse()
+y_df = pd.DataFrame(Y, columns=['Y'])
+Y['Class'] = pd.qcut(y_df['Y'], 10, labels=decile_labels)
+print(Y['Class'])
+# assert Y['Class'].max() == 1, f"highest value {Y['Class'].max()} should be Class 1"
+# assert Y['Class'].min() == 10, f"lowest value {Y['Class'].min()} should be Class 10"
+min_idx_in_y = np.where(Y['Y'] == Y['Y'].min())
+max_idx_in_y = np.where(Y['Y'] == Y['Y'].max())
+print(f"at index {min_idx_in_y}, Value: {Y['Y'].iloc[min_idx_in_y].iloc[0]}, Class: {Y.iloc[min_idx_in_y].iloc[0]['Class']}")
+print(f"at index {max_idx_in_y}, Value: {Y['Y'].iloc[max_idx_in_y].iloc[0]}, Class: {Y.iloc[max_idx_in_y].iloc[0]['Class']}")
+assert Y.iloc[min_idx_in_y].iloc[0]['Class'] == 10, f"{Y.min()} should be Class 10 in Y"
+assert Y.iloc[max_idx_in_y].iloc[0]['Class'] == 1, f"{Y.max()} should be Class 1 in Y"
+
+
 # 1E
 
 
 class DiabetesDataset(Dataset):
     """
-    encapsulates the sklear diabetes dataset
+    encapsulates the diabetes dataset
     see
         https://pytorch.org/docs/stable/data.html#torch.utils.data.Dataset
         https://pytorch.org/tutorials/beginner/basics/data_tutorial.html for example implementation
@@ -107,7 +128,6 @@ class DiabetesDataset(Dataset):
         """
         fetching a data sample for a given key
         """
-        # TODO: w\wo Y, return Class as Target
         if self._with_Y:
             return self._transform(self._csv_df.iloc[idx, self._csv_df.columns != 'Target']),\
                 self._csv_df.iloc[idx, self._csv_df.columns == 'Target'].item()
@@ -122,6 +142,7 @@ if not os.path.exists(csv_file):
 
 
 def validate_diabetes_ds(ds):
+    print("\n* validate_diabetes_ds")
     print(f"number of rows: {len(ds)}")
     assert len(ds) == 442, f"expected 442, got {len(ds)}"
     features, target = ds[0]
@@ -135,21 +156,10 @@ def validate_diabetes_ds(ds):
     features, target = ds[-1]
     print(f"last row: features: {features}, size: {features.size()}, target: {target}")
 
-    print(f"number of rows: {len(ds)}")
-    assert len(ds) == 442, f"expected 442, got {len(ds)}"
-    features, target = ds[0]
-    print(f"first row: features: {features}, size: {features.size()}, target: {target}")
-    features, target = ds[1]
-    print(f"second row: features: {features}, size: {features.size()}, target: {target}")
-    features, target = ds[2]
-    print(f"third row: features: {features}, size: {features.size()}, target: {target}")
-    features, target = ds[441]
-    print(f"last row: features: {features}, size: {features.size()}, target: {target}")
-    features, target = ds[-1]
-    print(f"last row: features: {features}, size: {features.size()}, target: {target}")
 
-validate_diabetes_ds(DiabetesDataset(csv_file, with_y=False))
 validate_diabetes_ds(DiabetesDataset(csv_file, with_y=True))
+validate_diabetes_ds(DiabetesDataset(csv_file, with_y=False))
+
 
 # 1.6, 1.7
 
@@ -175,7 +185,7 @@ print(batch_features, batch_labels)
 
 # 1.8 - החוזה את Class על סמך שאר המשתנים
 
-from torch import nn
+
 
 
 def iterate_batch(input_tensor, labels):
@@ -203,14 +213,14 @@ def iterate_batch(input_tensor, labels):
 def render_accuracy_plot(batches, loss, acc, title):
     plt.figure(figsize=(12,4))
     plt.subplot(1,2,1)
-    plt.plot(range(batches), loss);
-    plt.title("CE loss");
-    plt.xlabel("Batch Number");
+    plt.plot(range(batches), loss)
+    plt.title("CE loss")
+    plt.xlabel("Batch Number")
     plt.subplot(1,2,2)
-    plt.plot(range(batches), acc);
+    plt.plot(range(batches), acc)
     avg_acc = round(float(np.average(acc)), 3)
     plt.title(f"Accuracy (avg: {avg_acc})")
-    plt.xlabel("Batch Number");
+    plt.xlabel("Batch Number")
     plt.suptitle(title)
     plt.show()
 
@@ -236,7 +246,7 @@ for batch_idx, (features, labels) in enumerate(train_dataloader):
     print(f"{batch_idx}, {features.size()}, {labels.size()}")
     loss[batch_idx], acc[batch_idx] = iterate_batch(features, labels)
 
-render_accuracy_plot(batches, loss, acc, "Diabetes DS, with Y")
+render_accuracy_plot(batches, loss, acc, "Diabetes DS: predict Class\deciles, 1 epoch, with Y")
 
 #
 # without Y
@@ -259,7 +269,7 @@ for batch_idx, (features, labels) in enumerate(train_dataloader):
     print(f"{batch_idx}, {features.size()}, {labels.size()}")
     loss[batch_idx], acc[batch_idx] = iterate_batch(features, labels)
 
-render_accuracy_plot(batches, loss, acc, "Diabetes DS, predict decile, 1 epoch, without Y")
+render_accuracy_plot(batches, loss, acc, "Diabetes DS, predict Class\deciles, 1 epoch, without Y")
 
 
 # 1.10
@@ -362,22 +372,22 @@ print("train and test, with Y...")
 diabetes_ds_wY = DiabetesDataset(csv_file, with_y=True)
 model = nn.Sequential(nn.Linear(11, 10), nn.LogSoftmax(dim=1))
 CE_loss = nn.NLLLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
 train_set_size = int(len(diabetes_ds_wY) * 0.8)
 test_set_size = len(diabetes_ds_wY) - train_set_size
-num_epochs = 100
+num_epochs = 1
 render_train_test_accuracy_plot(* train_and_test_subsets(test_set_size, train_set_size, diabetes_ds_wY, num_epochs=num_epochs),
-                                f"Diabetes, predict decile, {num_epochs} epochs, with Y")
+                                f"Diabetes: predict decile, {num_epochs} epochs, with Y")
 
 print("train and test, without Y...")
 diabetes_ds_woY = DiabetesDataset(csv_file, with_y=False)
 model = nn.Sequential(nn.Linear(10, 10), nn.LogSoftmax(dim=1))
 CE_loss = nn.NLLLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
 train_set_size = int(len(diabetes_ds_woY) * 0.8)
 test_set_size = len(diabetes_ds_woY) - train_set_size
 render_train_test_accuracy_plot(* train_and_test_subsets(test_set_size, train_set_size, diabetes_ds_woY, num_epochs=num_epochs),
-                                f"Diabetes, predict decile, {num_epochs} epochs, without Y")
+                                f"Diabetes: predict decile, {num_epochs} epochs, without Y")
 
 
 
@@ -392,15 +402,25 @@ class PercentageDiabetesDataset(DiabetesDataset):
         # override 'Target' column
         print("before: ", self._csv_df['Target'])
         percent_labels = [*range(1, 101)]
-        percent_labels.reverse()
         self._csv_df['Target'] = pd.qcut(pd.DataFrame(self._csv_df, columns=['Y'])['Y'], 100, percent_labels)
         print("after: ", self._csv_df['Target'])
 
 
 diabetes_perc_ds_wY = PercentageDiabetesDataset(csv_file, with_y=True)
-validate_diabetes_ds(diabetes_perc_ds_wY)
+#validate_diabetes_ds(diabetes_perc_ds_wY)
 diabetes_perc_ds_woY = PercentageDiabetesDataset(csv_file, with_y=False)
-validate_diabetes_ds(diabetes_perc_ds_woY)
+#validate_diabetes_ds(diabetes_perc_ds_woY)
+
+# verify 25 is 100, 325 is 1
+Y = diabetes_perc_ds_wY._csv_df['Y']
+Target = diabetes_perc_ds_wY._csv_df['Target']
+min_idx_in_y = np.where(Y == Y.min())
+max_idx_in_y = np.where(Y == Y.max())
+print(f"at index ({min_idx_in_y}), Value: ({Y.iloc[min_idx_in_y]}), Class: ({Target.iloc[min_idx_in_y]})")
+print(f"at index ({max_idx_in_y}), Value: ({Y.iloc[max_idx_in_y]}), Class: ({Target.iloc[max_idx_in_y]})")
+
+# assert Y.iloc[min_idx_in_y].iloc[0]['Class'] == 10, f"{Y.min()} should be Class 10 in Y"
+# assert Y.iloc[max_idx_in_y].iloc[0]['Class'] == 1, f"{Y.max()} should be Class 1 in Y"
 
 #
 # 1.11 - replay 8-10
@@ -438,5 +458,24 @@ for batch_idx, (features, labels) in enumerate(train_dataloader):
     loss[batch_idx], acc[batch_idx] = iterate_batch(features, labels)
 
 render_accuracy_plot(batches, loss, acc, "Percentage-Diabetes DS, predict percentage without Y")
+
+# repeat 1.10 with train\test sets
+
+print("train and test, with Y...")
+model = nn.Sequential(nn.Linear(11, 100),  nn.LogSoftmax(dim=1))
+CE_loss = nn.NLLLoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+train_set_size = int(len(diabetes_perc_ds_wY) * 0.8)
+test_set_size = len(diabetes_perc_ds_wY) - train_set_size
+num_epochs = 1
+render_train_test_accuracy_plot(* train_and_test_subsets(test_set_size, train_set_size, diabetes_perc_ds_wY, num_epochs=num_epochs),
+                                f"Diabetes: predict percentages, {num_epochs} epochs, with Y")
+
+print("train and test, without Y...")
+model = nn.Sequential(nn.Linear(10, 100),  nn.LogSoftmax(dim=1))
+CE_loss = nn.NLLLoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+render_train_test_accuracy_plot(* train_and_test_subsets(test_set_size, train_set_size, diabetes_perc_ds_woY, num_epochs=num_epochs),
+                                f"Diabetes: predict percentages, {num_epochs} epochs, with Y")
 
 # 1.14: percentage is too fine-grained accuracy. Deciles is a better option, specific for this scenario and likely to other scenarios

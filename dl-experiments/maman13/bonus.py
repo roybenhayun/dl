@@ -106,6 +106,10 @@ def train_and_test_subsets(test_set_size, train_set_size, dataset, num_epochs):
     min, max = dataset.get_labels_range()
     num_labels = max - min + 1  # TODO: the overall Range of Possible target Y values. maybe should limit to Actual values in this dataset?
     model = nn.Sequential(nn.Linear(10, num_labels),
+                          nn.ReLU(),
+                          nn.Linear(num_labels, num_labels),
+                          nn.ReLU(),
+                          nn.Linear(num_labels, num_labels),
                           nn.LogSoftmax(dim=1))
     CE_loss = nn.NLLLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
@@ -198,5 +202,5 @@ if __name__ == '__main__':
     print("train and test...")
     train_set_size = int(len(ds) * 0.8)
     test_set_size = len(ds) - train_set_size
-    render_train_test_accuracy_plot(*train_and_test_subsets(test_set_size, train_set_size, ds, 100),
+    render_train_test_accuracy_plot(*train_and_test_subsets(test_set_size, train_set_size, ds, 200),
                                     "Diabetes, predict Y as Target")
