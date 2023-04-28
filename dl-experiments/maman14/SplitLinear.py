@@ -61,7 +61,7 @@ if __name__ == '__main__':
     print("ex 1")
 
     batch_size = 10
-    features_num = 3 * 2  # ensure even number
+    features_num = 4 * 2  # ensure even number (that can split more than once)
     N = batch_size
     M = features_num
 
