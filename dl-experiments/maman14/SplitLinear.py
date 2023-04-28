@@ -27,31 +27,29 @@ class SplitLinear(nn.Module):
         print("---------------------------------")
 
     def forward(self, batch_input):
-        if self.training:
-            print("---------------------------------")
-            print("* forward pass (train N.A.)")
-            Y = torch.zeros(size=(N, M))
-            split = torch.split(batch_input, int(self.M/2), dim=1)
-            print(f"split input to 2 chunks: {split[0].shape}, {split[1].shape}")
-            for idx in range(N):
-                print(f"pass Z1 for batch {idx}")
-                r1 = self.linear1(split[0][idx])
-                print(f"Z1 output for chunk 1: {r1.shape}")
-                r2 = self.linear1(split[1][idx])
-                print(f"Z1 output for chunk 2: {r2.shape}")
-                print(f"pass Y1 for batch {idx}")
-                r3 = self.relu1(r1)
-                print(f"Y1 output for chunk 1: {r3.shape}")
-                r4 = self.relu1(r2)
-                print(f"Y1 output for chunk 2: {r4.shape}")
-                Y[idx] = torch.cat((r3, r4))
-                print(f"concatenate Y1 outputs: {Y[idx].shape}")
+        print("---------------------------------")
+        print("* forward pass (train N.A.)")
+        print("IMPL-NOTE: no training needed => no optimizer e.g., SGD, loss functions e.g., CE ")
+        Y = torch.zeros(size=(N, M))
+        split = torch.split(batch_input, int(self.M / 2), dim=1)
+        print(f"split input to 2 chunks: {split[0].shape}, {split[1].shape}")
+        for idx in range(N):
+            print(f"pass Z1 for batch {idx}")
+            r1 = self.linear1(split[0][idx])
+            print(f"Z1 output for chunk 1: {r1.shape}")
+            r2 = self.linear1(split[1][idx])
+            print(f"Z1 output for chunk 2: {r2.shape}")
+            print(f"pass Y1 for batch {idx}")
+            r3 = self.relu1(r1)
+            print(f"Y1 output for chunk 1: {r3.shape}")
+            r4 = self.relu1(r2)
+            print(f"Y1 output for chunk 2: {r4.shape}")
+            Y[idx] = torch.cat((r3, r4))
+            print(f"concatenate Y1 outputs: {Y[idx].shape}")
 
-            print(f"forward pass result: {Y.shape}")
-            print("---------------------------------")
-            return Y
-        else:
-            print("eval..")
+        print(f"forward pass result: {Y.shape}")
+        print("---------------------------------")
+        return Y
 
     def reset_parameters_impl(self):
         pass
