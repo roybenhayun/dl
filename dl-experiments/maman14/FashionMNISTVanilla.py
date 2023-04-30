@@ -42,6 +42,7 @@ def render_accuracy_plot(batches, loss, acc, title):
     plt.suptitle(title)
     plt.show()
 
+
 def train_fashion_mnist_nn():
     train_data_transformed = torchvision.datasets.FashionMNIST(root=r"C:\work_openu\DL\temp\fashion-mnist", train=True,
                                                                download=False,
@@ -55,19 +56,19 @@ def train_fashion_mnist_nn():
     print(f"batche size: {batch_size}")
     print(f"batches num: {len(train_dataloader)}")
 
-    model = nn.Sequential(nn.Linear(784, 10),
+    model = nn.Sequential(nn.Flatten(),
+                          nn.Linear(784, 10),
                           nn.LogSoftmax(dim=1))
     print(f"model: {model}")
     optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
-    CE_loss = nn.NLLLoss()
+    ce_loss = nn.NLLLoss()
     loss = torch.zeros(batches)
     acc = torch.zeros(batches)
     for batch_idx, (features, labels) in enumerate(train_dataloader):
         print(f"{batch_idx}, {features.size()}, {labels.size()}")
-        # flatten and change type to float
-        flat_features = torch.reshape(features, (batch_size, 784))
-        flat_features = flat_features.type(torch.float)
-        loss[batch_idx], acc[batch_idx] = iterate_batch(flat_features, labels, model, optimizer, CE_loss)
+        # change type to float
+        features = features.type(torch.float)
+        loss[batch_idx], acc[batch_idx] = iterate_batch(features, labels, model, optimizer, ce_loss)
 
     render_accuracy_plot(batches, loss, acc, f"Fashion-MNIST: batch size: {batch_size}, network: [Linear] -> [LogSoftmax]")
 
