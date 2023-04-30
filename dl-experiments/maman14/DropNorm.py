@@ -19,24 +19,25 @@ class DropNorm(nn.Module):
     def forward(self, batch_input):
         print("---------------------------------")
         print(f"+ DropNorm.forward({batch_input.shape})")
-        y = batch_input.clone()
 
         # create binary mask with half random elements as zeros
-        x = torch.randn(batch_input.shape)
-        mask_flat = torch.reshape(torch.ones(size=x.shape), (-1,))
-        zero_indices = np.random.choice(mask_flat.numel(), int(x.numel() * self._p), replace=False)
-        mask_flat[zero_indices] = 0
-        mask = mask_flat.view(batch_input.shape)
-        # apply mask
-        y = y * mask
+        rand_indices = torch.randn(batch_input.shape)
+        mask_flat = torch.reshape(torch.ones(size=rand_indices.shape), (-1,))  # flatten
+        # generate a random sample from indices [0 .. mask_flat.numel()]
+        zero_indices = np.random.choice(mask_flat.numel(), int(rand_indices.numel() * self._p), replace=False)
+        mask_flat[zero_indices] = 0  # create the 1\0 mask
+        mask = torch.reshape(mask_flat, batch_input.shape)  # reshape to original shape
+        
+        # apply the mask on the batch input
+        x = batch_input * mask
 
         # calculate mean (mu) and stddev (sigma square) of all non-zero elements
         # see p87
-        num_non_zero = y.numel() - len(zero_indices)
-        mu = ((y * mask).sum() / num_non_zero).item()
-        sigma2 = (torch.sqrt(((y - mu) * mask) ** 2).sum() / num_non_zero).item()
+        num_non_zero = x.numel() - len(zero_indices)
+        mu = ((x * mask).sum() / num_non_zero).item()
+        sigma2 = (torch.sqrt(((x - mu) * mask) ** 2).sum() / num_non_zero).item()
         epsilon = 10**-5
-        xhat = (y - mu) / math.sqrt(sigma2 + epsilon)
+        xhat = (x - mu) / math.sqrt(sigma2 + epsilon)
 
         # calc final Y
         y = self.gamma * xhat + self.beta
