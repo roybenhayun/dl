@@ -25,9 +25,10 @@ class DropNorm(nn.Module):
         # apply mask
         y = y * mask
 
-        # calculate mean and stddev
-        mean = torch.mean(y)
-        stddev = torch.std(y)
+        # calculate mean and stddev of all non-zero elements (can't use torch.mean \ std)
+        num_non_zero = y.numel() - len(zero_indices)
+        mean = ((y * mask).sum() / num_non_zero).item()
+        stddev = (torch.sqrt(((y - mean) * mask) ** 2).sum() / num_non_zero).item()
         epsilon = 0.0001
         y = (y - mean) / math.sqrt(stddev + epsilon)
 
