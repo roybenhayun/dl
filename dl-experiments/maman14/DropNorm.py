@@ -13,12 +13,15 @@ class DropNorm(nn.Module):
         self.gamma = 1
         self.beta = 0
         # declare as network parameters so will be learnt (p87)
-        # self.gamma = nn.Parameter(torch.ones(in_features))
-        # self.beta = nn.Parameter(torch.zeros(in_features))
 
     def forward(self, batch_input):
-        print("---------------------------------")
-        print(f"+ DropNorm.forward({batch_input.shape})")
+        # print("---------------------------------")
+        # print(f"+ DropNorm.forward({batch_input.shape})")
+        global gamma
+        gamma = nn.Parameter(torch.ones(batch_input.shape))
+        global beta
+        beta = nn.Parameter(torch.zeros(batch_input.shape))
+
 
         # create binary mask with half random elements as zeros
         rand_indices = torch.randn(batch_input.shape)
@@ -27,7 +30,7 @@ class DropNorm(nn.Module):
         zero_indices = np.random.choice(mask_flat.numel(), int(rand_indices.numel() * self._p), replace=False)
         mask_flat[zero_indices] = 0  # create the 1\0 mask
         mask = torch.reshape(mask_flat, batch_input.shape)  # reshape to original shape
-        
+
         # apply the mask on the batch input
         x = batch_input * mask
 
@@ -40,11 +43,13 @@ class DropNorm(nn.Module):
         xhat = (x - mu) / math.sqrt(sigma2 + epsilon)
 
         # calc final Y
-        y = self.gamma * xhat + self.beta
+        y = gamma * xhat + beta
 
-        print(f"+ DropNorm.forward() result: {y.shape}")
-        print("---------------------------------")
+        # print(f"+ DropNorm.forward() result: {y.shape}")
+        # print("---------------------------------")
+        # NOTE: when predicting: no gamma, beta
         return y
+
 
 
 if __name__ == '__main__':
