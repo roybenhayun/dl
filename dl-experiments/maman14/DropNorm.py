@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import numpy as np
 
 
 class DropNorm(nn.Module):
@@ -10,7 +11,22 @@ class DropNorm(nn.Module):
     def forward(self, batch_input):
         print("---------------------------------")
         print(f"+ DropNorm.forward({batch_input.shape})")
-        y = batch_input
+        y = batch_input.clone()
+
+        # zero half of the elements
+        # Create a tensor of any size with random values
+        tensor_size = (2, 3, 4)  # Example size
+        x = torch.randn(batch_input.shape)
+
+        # create binary mask with random zeros
+        mask_flat = torch.reshape(torch.ones(size=x.shape), (-1,))
+        zero_indices = np.random.choice(mask_flat.numel(), x.numel() // 2, replace=False)
+        mask_flat[zero_indices] = 0
+        mask = mask_flat.view(batch_input.shape)
+
+        # apply mask
+        y = y * mask
+
         print(f"+ DropNorm.forward() result: {y.shape}")
         print("---------------------------------")
         return y
