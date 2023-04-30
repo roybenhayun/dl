@@ -51,9 +51,6 @@ class SplitLinear(nn.Module):
         print("---------------------------------")
         return Y
 
-    def reset_parameters_impl(self):
-        pass
-
 
 if __name__ == '__main__':
     print("ex 1")
