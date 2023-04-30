@@ -14,25 +14,25 @@ class DropNorm(nn.Module):
         self.beta = 0
         # declare as network parameters so will be learnt (p87)
 
-    def forward(self, batch_input):
+    def forward(self, x):
         # print("---------------------------------")
         # print(f"+ DropNorm.forward({batch_input.shape})")
         global gamma
-        gamma = nn.Parameter(torch.ones(batch_input.shape))
+        gamma = nn.Parameter(torch.ones(x.shape))
         global beta
-        beta = nn.Parameter(torch.zeros(batch_input.shape))
+        beta = nn.Parameter(torch.zeros(x.shape))
 
 
         # create binary mask with half random elements as zeros
-        rand_indices = torch.randn(batch_input.shape)
+        rand_indices = torch.randn(x.shape)
         mask_flat = torch.reshape(torch.ones(size=rand_indices.shape), (-1,))  # flatten
         # generate a random sample from indices [0 .. mask_flat.numel()]
         zero_indices = np.random.choice(mask_flat.numel(), int(rand_indices.numel() * self._p), replace=False)
         mask_flat[zero_indices] = 0  # create the 1\0 mask
-        mask = torch.reshape(mask_flat, batch_input.shape)  # reshape to original shape
+        mask = torch.reshape(mask_flat, x.shape)  # reshape to original shape
 
         # apply the mask on the batch input
-        x = batch_input * mask
+        x = x * mask
 
         # calculate mean (mu) and stddev (sigma square) of all non-zero elements
         # see p87

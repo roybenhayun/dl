@@ -51,7 +51,7 @@ def train_fashion_mnist_nn(single_batch=True, use_DropNorm=False):
                                                                download=False,
                                                                transform=torchvision.transforms.PILToTensor())
 
-    batch_size = 100
+    batch_size = 10
     train_dataloader = DataLoader(train_data_transformed, batch_size, shuffle=True)
     print(f"samples num: {len(train_data_transformed)}")
     print(f"classes num: {len(train_data_transformed.classes)}")
