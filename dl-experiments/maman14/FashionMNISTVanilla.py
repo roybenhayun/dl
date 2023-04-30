@@ -6,6 +6,8 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
+from maman14.DropNorm import DropNorm
+
 
 def iterate_batch(input_tensor, labels, model, optimizer, ce_loss):
     optimizer.zero_grad()
@@ -44,7 +46,7 @@ def render_accuracy_plot(unit, results, loss, acc, title):
     plt.show()
 
 
-def train_fashion_mnist_nn(single_batch=True):
+def train_fashion_mnist_nn(single_batch=True, use_DropNorm=False):
     train_data_transformed = torchvision.datasets.FashionMNIST(root=r"C:\work_openu\DL\temp\fashion-mnist", train=True,
                                                                download=False,
                                                                transform=torchvision.transforms.PILToTensor())
@@ -57,13 +59,23 @@ def train_fashion_mnist_nn(single_batch=True):
     print(f"batche size: {batch_size}")
     print(f"batches num: {len(train_dataloader)}")
 
-    model = nn.Sequential(nn.Flatten(),  # flatten dimensions with size 1
-                          nn.Linear(784, 100), nn.ReLU(),
-                          nn.Dropout(p=0.5),
-                          nn.Linear(100, 10), nn.ReLU(),
-                          nn.Dropout(p=0.5),
-                          nn.Linear(10, 10),
-                          nn.LogSoftmax(dim=1))
+    if use_DropNorm:
+        model = nn.Sequential(nn.Flatten(),  # flatten dimensions with size 1
+                              nn.Linear(784, 100), nn.ReLU(),
+                              DropNorm(p=0.5),
+                              nn.Linear(100, 10), nn.ReLU(),
+                              DropNorm(p=0.5),
+                              nn.Linear(10, 10),
+                              nn.LogSoftmax(dim=1))
+    else:
+        model = nn.Sequential(nn.Flatten(),  # flatten dimensions with size 1
+                              nn.Linear(784, 100), nn.ReLU(),
+                              nn.Dropout(p=0.5),
+                              nn.Linear(100, 10), nn.ReLU(),
+                              nn.Dropout(p=0.5),
+                              nn.Linear(10, 10),
+                              nn.LogSoftmax(dim=1))
+
     print(f"model: {model}")
     module_names = '>'.join([type(module).__name__ for name, module in model.named_modules()])
 
@@ -106,5 +118,5 @@ def train_fashion_mnist_nn(single_batch=True):
 
 if __name__ == '__main__':
     print("Fashion-MNIST plain vanilla")
-    train_fashion_mnist_nn(single_batch=True)
+    train_fashion_mnist_nn(single_batch=True, use_DropNorm=True)
 

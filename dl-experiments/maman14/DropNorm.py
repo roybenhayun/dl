@@ -3,27 +3,17 @@ from torch import nn
 
 
 class DropNorm(nn.Module):
-    def __init__(self):
+    def __init__(self, p=0.5):
         super().__init__()
-
-        print("---------------------------------")
-        print("* init module")
-        print("DropNorm:")
-        print("---------------------------------")
+        print(f"* init DropNorm p:{p}")
 
     def forward(self, batch_input):
         print("---------------------------------")
-        Y = None
-        print("* forward pass")
-        mask = None
-        batch_stddev = -1
-        batch_variance = -1
-        epsilon = 0.000001
-        gamma = -1
-        beta = -1
-        print(f"forward pass result: {Y.shape}")
+        print(f"+ DropNorm.forward({batch_input.shape})")
+        y = batch_input
+        print(f"+ DropNorm.forward() result: {y.shape}")
         print("---------------------------------")
-        return Y
+        return y
 
 
 if __name__ == '__main__':
@@ -34,7 +24,9 @@ if __name__ == '__main__':
     N = batch_size
     M = features_num
 
-    d1 = DropNorm(batch_size, features_num)
-    t1 = torch.ones(size=(batch_size, features_num))
-    ret = d1(t1)
+    dn1 = DropNorm()
+    t1 = torch.ones(size=(batch_size, 1, features_num))
+    print(f"t1: {t1.shape}")
+    ret = dn1(t1)
+    print(f"ret: {ret.shape}")
 
