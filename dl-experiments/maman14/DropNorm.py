@@ -9,6 +9,7 @@ class DropNorm(nn.Module):
     def __init__(self, p=0.5):
         super().__init__()
         print(f"* init DropNorm p:{p}")
+        self._p = p
 
     def forward(self, batch_input):
         print("---------------------------------")
@@ -18,7 +19,7 @@ class DropNorm(nn.Module):
         # create binary mask with half random elements as zeros
         x = torch.randn(batch_input.shape)
         mask_flat = torch.reshape(torch.ones(size=x.shape), (-1,))
-        zero_indices = np.random.choice(mask_flat.numel(), x.numel() // 2, replace=False)
+        zero_indices = np.random.choice(mask_flat.numel(), int(x.numel() * self._p), replace=False)
         mask_flat[zero_indices] = 0
         mask = mask_flat.view(batch_input.shape)
         # apply mask
