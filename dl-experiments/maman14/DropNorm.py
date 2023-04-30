@@ -10,6 +10,11 @@ class DropNorm(nn.Module):
         super().__init__()
         print(f"* init DropNorm p:{p}")
         self._p = p
+        self.gamma = 1
+        self.beta = 0
+        # declare as network parameters so will be learnt (p87)
+        # self.gamma = nn.Parameter(torch.ones(in_features))
+        # self.beta = nn.Parameter(torch.zeros(in_features))
 
     def forward(self, batch_input):
         print("---------------------------------")
@@ -25,17 +30,16 @@ class DropNorm(nn.Module):
         # apply mask
         y = y * mask
 
-        # calculate mean and stddev of all non-zero elements (can't use torch.mean \ std)
+        # calculate mean (mu) and stddev (sigma square) of all non-zero elements
+        # see p87
         num_non_zero = y.numel() - len(zero_indices)
-        mean = ((y * mask).sum() / num_non_zero).item()
-        stddev = (torch.sqrt(((y - mean) * mask) ** 2).sum() / num_non_zero).item()
-        epsilon = 0.0001
-        y = (y - mean) / math.sqrt(stddev + epsilon)
+        mu = ((y * mask).sum() / num_non_zero).item()
+        sigma2 = (torch.sqrt(((y - mu) * mask) ** 2).sum() / num_non_zero).item()
+        epsilon = 10**-5
+        xhat = (y - mu) / math.sqrt(sigma2 + epsilon)
 
         # calc final Y
-        yi = 1
-        bi = 0
-        y = yi * y + bi
+        y = self.gamma * xhat + self.beta
 
         print(f"+ DropNorm.forward() result: {y.shape}")
         print("---------------------------------")
