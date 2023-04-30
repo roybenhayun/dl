@@ -58,10 +58,14 @@ def train_fashion_mnist_nn(single_batch=True):
     print(f"batches num: {len(train_dataloader)}")
 
     model = nn.Sequential(nn.Flatten(),  # flatten dimensions with size 1
-                          nn.Linear(784, 10),
+                          nn.Linear(784, 100), nn.ReLU(),
+                          nn.Dropout(p=0.5),
+                          nn.Linear(100, 10), nn.ReLU(),
+                          nn.Dropout(p=0.5),
+                          nn.Linear(10, 10),
                           nn.LogSoftmax(dim=1))
     print(f"model: {model}")
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.001)
     ce_loss = nn.NLLLoss()
     if single_batch:
         loss = torch.zeros(batches)
