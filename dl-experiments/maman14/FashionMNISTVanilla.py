@@ -77,7 +77,7 @@ def train_fashion_mnist_nn(single_batch=True):
             loss[batch_idx], acc[batch_idx] = iterate_batch(features, labels, model, optimizer, ce_loss)
 
         render_accuracy_plot("Batch", batches, loss, acc,
-                             f"Fashion-MNIST single-batch (batch size: {batch_size}, nn: [Flatten] -> [Linear] -> [LogSoftmax])")
+                             f"Fashion-MNIST single-batch (batch size: {batch_size}, nn: [Flatten]>[Linear]>[ReLU]>[Dropout]>[Linear]>[ReLU]>[Dropout]>[LogSoftmax])")
     else:
         num_epochs = 10
         print(f"epochs num: {num_epochs}")
@@ -99,10 +99,10 @@ def train_fashion_mnist_nn(single_batch=True):
               f"total avg acc: {round(float(np.average(train_set_acc)), 3)}")
 
         render_accuracy_plot("Epoch", num_epochs, train_set_loss, train_set_acc,
-                             f"Fashion-MNIST {num_epochs} epochs (batch size: {batch_size}, nn: [Flatten] -> [Linear] -> [LogSoftmax])")
+                             f"Fashion-MNIST {num_epochs} epochs (batch size: {batch_size}, nn: [Flatten]>[Linear]>[ReLU]>[Dropout]>[Linear]>[ReLU]>[Dropout]>[LogSoftmax])")
 
 
 if __name__ == '__main__':
     print("Fashion-MNIST plain vanilla")
-    train_fashion_mnist_nn(single_batch=False)
+    train_fashion_mnist_nn(single_batch=True)
 
