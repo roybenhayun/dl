@@ -64,8 +64,6 @@ def train_fashion_mnist_nn(single_batch=True, use_DropNorm=False):
                               nn.Linear(784, 100), nn.ReLU(),
                               DropNorm(bn_size=100, p=0.5),
                               nn.Linear(100, 10), nn.ReLU(),
-                              DropNorm(bn_size=10, p=0.5),
-                              nn.Linear(10, 10),
                               nn.LogSoftmax(dim=1))
     else:
         model = nn.Sequential(nn.Flatten(),  # flatten dimensions with size 1
@@ -73,9 +71,6 @@ def train_fashion_mnist_nn(single_batch=True, use_DropNorm=False):
                               nn.LayerNorm(100),
                               nn.Dropout(p=0.5),
                               nn.Linear(100, 10), nn.ReLU(),
-                              nn.LayerNorm(10),
-                              nn.Dropout(p=0.5),
-                              nn.Linear(10, 10),
                               nn.LogSoftmax(dim=1))
 
     print(f"model: {model}")
