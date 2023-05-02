@@ -17,9 +17,6 @@ class DropNorm(nn.Module):
         self.running_sigma2 = 0
 
     def forward(self, x):
-        # print("---------------------------------")
-        # print(f"+ DropNorm.forward({batch_input.shape})")
-
         if self.training:  # see p112
             # create binary mask with half random elements as zeros
             rand_indices = torch.randn(x.shape)
@@ -39,22 +36,27 @@ class DropNorm(nn.Module):
         # see p87
         epsilon = 10 ** -5
         if self.training:
-            num_non_zero = x.numel() - len(zero_indices)
-            mu = ((x * mask).sum() / num_non_zero)
-            sigma2 = (torch.sqrt(((x - mu) * mask) ** 2).sum() / num_non_zero)
+            # compute the mean and variance along the first dimension using the dim parameter
+            # use keepdim parameter to ensure tensors have a size of [batch#, 1]
+
+            # compute the mean of non-zero elements
+            # mu = torch.sum(x, dim=1, keepdim=True) / torch.sum(x != 0, dim=1, keepdim=True)
+            # compute the variance of non-zero elements
+            # sigma2 = torch.sum((x - mu) ** 2, dim=1, keepdim=True) / torch.sum(x != 0, dim=1, keepdim=True)
+
+            mu = x.mean(dim=1, keepdim=True)
+            sigma2 = x.var(dim=1, keepdim=True)
             self.running_mu = 0.9 * self.running_mu + 0.1*mu
-            self.running_mu = 0.9 * self.running_sigma2 + 0.1 * sigma2
+            self.running_sigma2 = 0.9 * self.running_sigma2 + 0.1 * sigma2
         else:
             # see p88: alternative mu,sigma2 for eval mode
             mu = self.running_mu
             sigma2 = self.running_sigma2
-        xhat = (x - mu) / math.sqrt(sigma2 + epsilon)
+        #xhat = (x - mu) / torch.sqrt(sigma2 + epsilon)
+        xhat = torch.where(x!=0, (x - mu) / torch.sqrt(sigma2 + epsilon), x)
 
         # calc final Y
-        y = self.gamma * xhat + self.beta
-
-        # print(f"+ DropNorm.forward() result: {y.shape}")
-        # print("---------------------------------")
-        # NOTE: when predicting: no gamma, beta
+        #y = self.gamma * xhat + self.beta
+        y = torch.where(x!=0, self.gamma * xhat + self.beta, xhat)
         return y
 
