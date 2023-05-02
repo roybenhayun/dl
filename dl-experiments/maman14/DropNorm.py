@@ -37,13 +37,13 @@ class DropNorm(nn.Module):
 
         # calculate mean (mu) and stddev (sigma square) of all non-zero elements
         # see p87
+        epsilon = 10 ** -5
         if self.training:
             num_non_zero = x.numel() - len(zero_indices)
             mu = ((x * mask).sum() / num_non_zero)
             sigma2 = (torch.sqrt(((x - mu) * mask) ** 2).sum() / num_non_zero)
             self.running_mu = 0.9 * self.running_mu + 0.1*mu
             self.running_mu = 0.9 * self.running_sigma2 + 0.1 * sigma2
-            epsilon = 10**-5
         else:
             # see p88: alternative mu,sigma2 for eval mode
             mu = self.running_mu

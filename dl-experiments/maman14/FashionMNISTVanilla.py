@@ -149,5 +149,5 @@ def train_and_test_fashion_mnist_nn(single_batch=True, use_DropNorm=False):
 
 if __name__ == '__main__':
     print("Fashion-MNIST plain vanilla")
-    train_and_test_fashion_mnist_nn(single_batch=True, use_DropNorm=False)
+    train_and_test_fashion_mnist_nn(single_batch=True, use_DropNorm=True)
 
