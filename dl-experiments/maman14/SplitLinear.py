@@ -1,9 +1,7 @@
 import torch
 from torch import nn
 import math
-from tqdm import tqdm
-import sklearn.datasets as skds
-import matplotlib.pyplot as plt
+
 
 class SplitLinear(nn.Module):
     def __init__(self, N, M):
@@ -12,11 +10,14 @@ class SplitLinear(nn.Module):
         self.M = M
 
         self.linear1 = nn.Linear(int(self.M/2), int(self.M/2))
+
+        #init parameters. see p93 - uniform distribution in [sqrt(-1/Kin), sqrt(1/Kin)] where Kin == M/2
         start = -(1/math.sqrt(int(self.M/2)))
         end = (1 / math.sqrt(int(self.M / 2)))
         torch.nn.init.uniform_(self.linear1.weight, start, end)
 
         self.relu1 = nn.ReLU()
+
         print("---------------------------------")
         print("* init module")
         print("SplitLinear:")
@@ -30,22 +31,19 @@ class SplitLinear(nn.Module):
         print("---------------------------------")
         print("* forward pass (train N.A.)")
         print("IMPL-NOTE: no training needed => no optimizer e.g., SGD, loss functions e.g., CE ")
-        Y = torch.zeros(size=(N, M))
         split = torch.split(batch_input, int(self.M / 2), dim=1)
         print(f"split input to 2 chunks: {split[0].shape}, {split[1].shape}")
-        for idx in range(N):
-            print(f"pass Z1 for batch {idx}")
-            r1 = self.linear1(split[0][idx])
-            print(f"Z1 output for chunk 1: {r1.shape}")
-            r2 = self.linear1(split[1][idx])
-            print(f"Z1 output for chunk 2: {r2.shape}")
-            print(f"pass Y1 for batch {idx}")
-            r3 = self.relu1(r1)
-            print(f"Y1 output for chunk 1: {r3.shape}")
-            r4 = self.relu1(r2)
-            print(f"Y1 output for chunk 2: {r4.shape}")
-            Y[idx] = torch.cat((r3, r4))
-            print(f"concatenate Y1 outputs: {Y[idx].shape}")
+
+        r1 = self.linear1(split[0])
+        print(f"Z1 output for chunk 1: {r1.shape}")
+        r2 = self.linear1(split[1])
+        print(f"Z1 output for chunk 2: {r2.shape}")
+        r3 = self.relu1(r1)
+        print(f"Y1 output for chunk 1: {r3.shape}")
+        r4 = self.relu1(r2)
+        print(f"Y1 output for chunk 2: {r4.shape}")
+        Y = torch.cat((r3, r4), dim=1)
+        print(f"concatenate Y1 outputs: {Y.shape}")
 
         print(f"forward pass result: {Y.shape}")
         print("---------------------------------")
