@@ -12,7 +12,7 @@ class MyConvolution(nn.Module):
         self.padding = padding
 
         self.weights = nn.Parameter(torch.randn(out_channels, in_channels, kernel_size[0], kernel_size[1]))
-        self.biases = nn.Parameter(torch.zeros(out_channels))
+        self.biases = nn.Parameter(torch.zeros(out_channels))  # TODO: see 34min in lecture
 
     def forward(self, x):
         batch_size, in_channels, input_height, input_width = x.shape
@@ -70,6 +70,7 @@ if __name__ == '__main__':
     output2 = conv(input_tensor)
     print(output2.shape)
 
+    # TODO: compare time it took for each
     print(output1[0][0][0][0] == output2[0][0][0][0])
     print("done")
 
