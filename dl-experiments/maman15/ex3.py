@@ -73,7 +73,7 @@ def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_r
             # change type to float (needed in forward pass)
             features = features.type(torch.float)
             loss[batch_idx], acc[batch_idx], _ = iterate_batch(features, labels, model, optimizer, ce_loss)
-            print(f"loss: {loss[batch_idx]}, acc: {acc[batch_idx]}")
+            print(f"loss: {loss[batch_idx]}, acc: {acc[batch_idx]} ?> {min_threshold}")
             if acc[batch_idx] > min_threshold:
                 print(f"reached threshold {min_threshold}")
                 break
@@ -227,4 +227,4 @@ if __name__ == '__main__':
     for param in resnet18.parameters():
         print(f"ResNet layer requires_grad: {param.requires_grad}")
 
-    train_and_test_cifar10(resnet18, cifar10_optimizer, cifar10_to_resnet18_transforms, True)
+    train_and_test_cifar10(resnet18, cifar10_optimizer, cifar10_to_resnet18_transforms, 0.7, True)
