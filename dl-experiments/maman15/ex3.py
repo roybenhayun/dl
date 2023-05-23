@@ -51,7 +51,7 @@ def render_accuracy_plot(unit, results, loss, acc, title):
     plt.show()
 
 
-def train_and_test_cifar10(model, optimizer, transforms, single_batch=True):
+def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_run=True):
     train_data_transformed = torchvision.datasets.CIFAR10(root=r"C:\work_openu\DL\temp\cifar-10",
                                                           train=True, download=False,
                                                           transform=transforms)
@@ -65,7 +65,7 @@ def train_and_test_cifar10(model, optimizer, transforms, single_batch=True):
     print(f"batches num: {len(train_dataloader)}")
 
     ce_loss = nn.NLLLoss()
-    if single_batch:  # actually, it's a single epoch. it's the chart that is per batches..
+    if single_run:  # actually, it's a single epoch. it's the chart that is per batches..
         loss = torch.zeros(batches)
         acc = torch.zeros(batches)
         for batch_idx, (features, labels) in enumerate(train_dataloader):
@@ -74,9 +74,12 @@ def train_and_test_cifar10(model, optimizer, transforms, single_batch=True):
             features = features.type(torch.float)
             loss[batch_idx], acc[batch_idx], _ = iterate_batch(features, labels, model, optimizer, ce_loss)
             print(f"loss: {loss[batch_idx]}, acc: {acc[batch_idx]}")
+            if acc[batch_idx] > min_threshold:
+                print(f"reached threshold {min_threshold}")
+                break
 
         render_accuracy_plot("Batch", batches, loss, acc,
-                             f"ResNet/CIFAR10 single-batch (batch size: {batch_size}, nn: ResNet18/CIFAR10 Classifier)")
+                             f"ResNet/CIFAR10 single-run (batch size: {batch_size}")
     else:
         num_epochs = 10
         print(f"epochs num: {num_epochs}")
@@ -98,15 +101,15 @@ def train_and_test_cifar10(model, optimizer, transforms, single_batch=True):
               f"total avg acc: {round(float(np.average(train_set_acc)), 3)}")
 
         render_accuracy_plot("Epoch", num_epochs, train_set_loss, train_set_acc,
-                             f"ResNet/CIFAR10 {num_epochs} epochs (batch size: {batch_size}, nn: ResNet18/CIFAR10 Classifier)")
+                             f"ResNet/CIFAR10 {num_epochs} epochs (batch size: {batch_size}")
 
     #
     # eval with test data
     #
 
-    test_data_transformed = torchvision.datasets.FashionCIFAR10MNIST(root=r"C:\work_openu\DL\temp\cifar-10",
-                                                                     train=False, download=False,
-                                                                     transform=transforms)
+    test_data_transformed = torchvision.datasets.CIFAR10(root=r"C:\work_openu\DL\temp\cifar-10",
+                                                         train=False, download=False,
+                                                         transform=transforms)
     test_dataloader = DataLoader(test_data_transformed, batch_size, shuffle=True)
     samples_num = len(test_data_transformed)
     print(f"samples num: {samples_num}")
@@ -129,7 +132,7 @@ def train_and_test_cifar10(model, optimizer, transforms, single_batch=True):
     print(f"avg acc: {round(float(np.average(test_set_acc)), 3)}")
     print(f"total accuracy: {total_acc} / {samples_num} = {round(total_acc.item() / samples_num, 3)}")
     render_accuracy_plot("Batch", test_batches, test_set_loss, test_set_acc,
-                         f"CIFAR10 test set (ACC: {round(total_acc.item() / samples_num, 3)}, nn: {module_names})")
+                         f"CIFAR10 test set (ACC: {round(total_acc.item() / samples_num, 3)})")
 
 
 if __name__ == '__main__':
@@ -168,12 +171,6 @@ if __name__ == '__main__':
     plt.show()
 
     # 3.D
-
-    # resnet18 = models.resnet18(pretrained=True)  # deprecated. see https://pytorch.org/vision/stable/models.html
-    # Before using the pre-trained models, one must preprocess the image
-    # (resize with right resolution/interpolation, apply inference transforms, rescale the values etc).
-    # All the necessary information for the inference transforms of each pre-trained model is provided on
-    # its weights documentation
 
     resnet18_weights = models.ResNet18_Weights.IMAGENET1K_V1
     print(f"ResNet weights default: {models.ResNet18_Weights.DEFAULT}")
