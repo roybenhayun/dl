@@ -183,6 +183,27 @@ def display_10_images(title, images_arr, class_names, labels):
     plt.show()
 
 
+class ResBlockDownSamp(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.relu = nn.ReLU()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, stride=2, bias=False)  #
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding="same", bias=False)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.downsampX = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=2, bias=False)
+
+    def forward(self, X):
+        Y1 = self.conv1(X)
+        Y1 = self.bn1(Y1)
+        Y1 = self.relu(Y1)
+        Y1 = self.conv2(Y1)
+        Y1 = self.bn2(Y1)
+        Y2 = Y1 + self.downsampX(X)  #
+        Y = self.relu(Y2)
+        return Y
+
+
 if __name__ == '__main__':
     print("ex- main")
 
@@ -265,4 +286,11 @@ if __name__ == '__main__':
     for param in resnet18.parameters():
         print(f"ResNet layer requires_grad: {param.requires_grad}")
 
-    train_and_test_cifar10(resnet18, cifar10_optimizer, cifar10_to_resnet18_transforms, 0.7, True)
+    # train_and_test_cifar10(resnet18, cifar10_optimizer, cifar10_to_resnet18_transforms, 0.7, True)
+
+    my_res_model = nn.Sequential(ResBlockDownSamp(3, 6),
+                                 ResBlockDownSamp(6, 12),
+                                 ResBlockDownSamp(12, 24),
+                                 nn.AdaptiveAvgPool2d(512),  # (1228800x512 and 1228800x10) (1228800x512 and 12288000x10)
+                                 Linear(in_features=512, out_features=len(cifar10_classes), bias=True))
+    train_and_test_cifar10(my_res_model, cifar10_optimizer, cifar10_to_resnet18_transforms, 0.7, True)
