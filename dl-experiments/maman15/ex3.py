@@ -87,7 +87,6 @@ def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_r
             top_10_fp_images = torch.where(torch.reshape(top_fp_values, (10,1,1,1)) > torch.reshape(top_10_fp_values, (10,1,1,1)), features[top_fp_indices], top_10_fp_images)
             top_10_fp_labels = torch.where(top_fp_values > top_10_fp_values, top_fp_labels, top_10_fp_labels)
             top_10_fp_values = torch.where(top_fp_values > top_10_fp_values, top_fp_values, top_10_fp_values)
-            display_10_images("top 10 false-positives", top_10_fp_images, train_data_transformed.classes, top_10_fp_labels.int())
             print(f"loss: {loss[batch_idx]}, acc: {acc[batch_idx]} ?> {min_threshold}")
             if acc[batch_idx] > min_threshold:
                 print(f"reached threshold {min_threshold}")
@@ -107,6 +106,9 @@ def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_r
             for batch_idx, (features, labels) in enumerate(train_dataloader):
                 features = features.type(torch.float)  # change type to float
                 batch_loss, batch_acc, predicted, top_fp_values, top_fp_indices, top_fp_labels = iterate_batch(features, labels, model, optimizer, ce_loss)
+                top_10_fp_images = torch.where(torch.reshape(top_fp_values, (10,1,1,1)) > torch.reshape(top_10_fp_values, (10,1,1,1)), features[top_fp_indices], top_10_fp_images)
+                top_10_fp_labels = torch.where(top_fp_values > top_10_fp_values, top_fp_labels, top_10_fp_labels)
+                top_10_fp_values = torch.where(top_fp_values > top_10_fp_values, top_fp_values, top_10_fp_values)
             train_set_loss[epoch] = float(np.average(batch_loss))
             train_set_acc[epoch] = float(np.average(batch_acc))
             print(f"epoch avg loss: {round(float(np.average(train_set_loss[epoch])), 3)}, "
@@ -117,6 +119,9 @@ def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_r
 
         render_accuracy_plot("Epoch", num_epochs, train_set_loss, train_set_acc,
                              f"ResNet/CIFAR10 {num_epochs} epochs (batch size: {batch_size}")
+
+    display_10_images("top 10 false-positives in training",
+                      top_10_fp_images, train_data_transformed.classes, top_10_fp_labels.int())
 
     #
     # eval with test data
@@ -136,24 +141,28 @@ def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_r
     test_set_loss = torch.zeros(len(test_dataloader))
     test_set_acc = torch.zeros(len(test_dataloader))
     total_acc = 0
-    curr_top_false_positive_values = torch.zeros(10)
-    curr_top_false_positive_indices = torch.zeros(10)
+    top_10_fp_values = torch.zeros(10)
+    top_10_fp_labels = torch.zeros(10)
+    top_10_fp_images = torch.zeros(10, 3, 224, 224)
     with torch.no_grad():
         for batch_idx, (features, labels) in tqdm(enumerate(test_dataloader), unit="batch"):
             # change type to float (needed in forward pass)
             features = features.type(torch.float)
             test_set_loss[batch_idx], test_set_acc[batch_idx], predicted, top_fp_values, top_fp_indices, top_fp_labels = iterate_batch(features, labels, model, optimizer, ce_loss)
+            top_10_fp_images = torch.where(torch.reshape(top_fp_values, (10, 1, 1, 1)) > torch.reshape(top_10_fp_values, (10, 1, 1, 1)), features[top_fp_indices], top_10_fp_images)
+            top_10_fp_labels = torch.where(top_fp_values > top_10_fp_values, top_fp_labels, top_10_fp_labels)
+            top_10_fp_values = torch.where(top_fp_values > top_10_fp_values, top_fp_values, top_10_fp_values)
+
             total_acc += predicted
 
 
     print(f"avg loss: {round(float(np.average(test_set_loss)), 3)}")
     print(f"avg acc: {round(float(np.average(test_set_acc)), 3)}")
     print(f"total accuracy: {total_acc} / {samples_num} = {round(total_acc.item() / samples_num, 3)}")
-    print(f"top false positive lables: {top_false_positive_indices}")
-    print(f"top false positive values: {top_false_positive_values}")
     render_accuracy_plot("Batch", test_batches, test_set_loss, test_set_acc,
                          f"CIFAR10 test set (ACC: {round(total_acc.item() / samples_num, 3)})")
-
+    display_10_images("top 10 false-positives in training",
+                      top_10_fp_images, train_data_transformed.classes, top_10_fp_labels.int())
 
 
 def display_10_images(title, images_arr, class_names, labels):
