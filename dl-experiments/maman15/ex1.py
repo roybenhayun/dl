@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-
+import math
 
 class MyConvolution(nn.Module):
     def __init__(self, in_channels=1, out_channels=1, kernel_size=(1, 1), stride=1, padding=0):
@@ -12,7 +12,11 @@ class MyConvolution(nn.Module):
         self.padding = padding
 
         self.weights = nn.Parameter(torch.randn(out_channels, in_channels, kernel_size[0], kernel_size[1]))
-        self.biases = nn.Parameter(torch.zeros(out_channels))  # TODO: see 34min in lecture
+        bias_start = -(1/math.sqrt(kernel_size[0] * kernel_size[1]))
+        bias_end = (1/math.sqrt(kernel_size[0] * kernel_size[1]))
+        biases = torch.zeros(out_channels)
+        torch.nn.init.uniform_(biases, bias_start, bias_end)
+        self.biases = nn.Parameter(biases)  # TODO: see 34min in lecture
 
     def forward(self, x):
         batch_size, in_channels, input_height, input_width = x.shape
@@ -41,7 +45,7 @@ class MyConvolution(nn.Module):
 
     def pad_input(self, x, padding):
         batch_size, in_channels, input_height, input_width = x.shape
-        # add paddin in the image dimensions
+        # add padding in the image dimensions
         padded_height = input_height + 2 * padding
         padded_width = input_width + 2 * padding
 
