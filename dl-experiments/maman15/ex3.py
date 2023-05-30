@@ -120,7 +120,8 @@ def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_r
         render_accuracy_plot("Epoch", num_epochs, train_set_loss, train_set_acc,
                              f"ResNet/CIFAR10 {num_epochs} epochs (batch size: {batch_size}")
 
-    display_10_images("top 10 false-positives in training",
+    # NOTE: the displayed top 10 images are transformed. can either keep a copy of original or apply backward transformational operations
+    display_10_images("top 10 false-positives in training (images transformed)",
                       top_10_fp_images, train_data_transformed.classes, top_10_fp_labels.int())
 
     #
@@ -161,7 +162,9 @@ def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_r
     print(f"total accuracy: {total_acc} / {samples_num} = {round(total_acc.item() / samples_num, 3)}")
     render_accuracy_plot("Batch", test_batches, test_set_loss, test_set_acc,
                          f"CIFAR10 test set (ACC: {round(total_acc.item() / samples_num, 3)})")
-    display_10_images("top 10 false-positives in training",
+
+    # NOTE: the displayed top 10 images are transformed. can either keep a copy of original or apply backward transformational operations
+    display_10_images("top 10 false-positives in test (images transformed)",
                       top_10_fp_images, train_data_transformed.classes, top_10_fp_labels.int())
 
 
