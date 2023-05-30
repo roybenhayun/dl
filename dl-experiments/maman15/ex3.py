@@ -152,6 +152,20 @@ def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_r
 
 
 
+def display_10_images(title, images_arr, class_names, labels):
+    fig = plt.figure()
+    plt.suptitle(title)
+    for i in range(10):
+        ax = fig.add_subplot(2, 5, i + 1)
+        # plt.imshow requires the color dimension last. need to permute from [3, M, N] to [M, N, 3]
+        transposed_img = images_arr[i].permute(1, 2, 0)
+        plt.imshow(transposed_img)
+        ax.set_title(class_names[labels[i]])
+        ax.axes.get_xaxis().set_visible(False)
+        ax.axes.get_yaxis().set_visible(False)
+
+    plt.show()
+
 
 if __name__ == '__main__':
     print("ex- main")
@@ -176,17 +190,7 @@ if __name__ == '__main__':
     iterator = iter(train_dataloader)
     cifar10_imgs, cifar10_labels = next(iterator)
     class_names = train_data_transformed.classes
-    fig = plt.figure()
-    for i in range(10):
-        ax = fig.add_subplot(2, 5, i + 1)
-        # plt.imshow requires the color dimension last. need to permute from [3, M, N] to [M, N, 3]
-        transposed_img = cifar10_imgs[i].permute(1, 2, 0)
-        plt.imshow(transposed_img)
-        ax.set_title(class_names[cifar10_labels[i]])
-        ax.axes.get_xaxis().set_visible(False)
-        ax.axes.get_yaxis().set_visible(False)
-
-    plt.show()
+    display_10_images("10 CIFAR10 images", cifar10_imgs, class_names, cifar10_labels)
 
     # 3.D
 
