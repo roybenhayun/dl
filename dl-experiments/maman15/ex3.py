@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 
 
-def iterate_batch(input_tensor, labels, model, optimizer, ce_loss, curr_top_false_positive_values=None, curr_top_false_positive_indices=None):
+def iterate_batch(input_tensor, labels, model, optimizer, ce_loss):
     if model.training:
         optimizer.zero_grad()
 
@@ -32,20 +32,16 @@ def iterate_batch(input_tensor, labels, model, optimizer, ce_loss, curr_top_fals
     predicted_labels = y_model.argmax(dim=1)
 
     # top false-positive
-    if not model.training and curr_top_false_positive_values is not None:
-        max_values, max_values_indices = torch.max(y_model, dim=1)
-        predicted = predicted_labels == labels
-        false_positives = torch.where(predicted, 0, max_values)
-        top_values, top_indices = torch.topk(false_positives, k=10)
-        top_false_positive_values = max_values[top_indices]
-        top_false_positive_indices = max_values_indices[top_indices]
+    max_values, max_values_indices = torch.max(y_model, dim=1)  #  per each prediction, get its max prediction value (dim=1) i.e., from [100, 10] get 100 max predictions from the 10 options each has
+    predicted = predicted_labels == labels
+    false_positives = torch.where(predicted, 0, max_values)
+    top_fp_values, top_fp_indices = torch.topk(false_positives, k=10)  # top 10 false-positive predictions: values and the indices of the prediction within the 100
+    #top_false_positive_values = max_values[top_indices]
+    top_fp_labels = max_values_indices[top_fp_indices]
 
-        curr_top_false_positive_indices = torch.where(top_false_positive_values > curr_top_false_positive_values, top_false_positive_indices, curr_top_false_positive_indices)
-        curr_top_false_positive_values = torch.where(top_false_positive_values > curr_top_false_positive_values, top_false_positive_values, curr_top_false_positive_values)
-
-    total_predicted = (predicted_labels == labels).sum()
+    total_predicted = predicted.sum()
     acc = total_predicted / len(labels)
-    return loss.detach(), acc.detach(), total_predicted, curr_top_false_positive_values, curr_top_false_positive_indices
+    return loss.detach(), acc.detach(), total_predicted, top_fp_values, top_fp_indices, top_fp_labels
 
 
 def render_accuracy_plot(unit, results, loss, acc, title):
@@ -77,6 +73,9 @@ def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_r
     print(f"batches num: {len(train_dataloader)}")
 
     ce_loss = nn.NLLLoss()
+    top_10_fp_values = torch.zeros(10)
+    top_10_fp_labels = torch.zeros(10)
+    top_10_fp_images = torch.zeros(10, 3, 224, 224)
     if single_run:  # actually, it's a single epoch. it's the chart that is per batches..
         loss = torch.zeros(batches)
         acc = torch.zeros(batches)
@@ -84,7 +83,11 @@ def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_r
             print(f"{batch_idx}, {features.size()}, {labels.size()}")
             # change type to float (needed in forward pass)
             features = features.type(torch.float)
-            loss[batch_idx], acc[batch_idx], _, _, _ = iterate_batch(features, labels, model, optimizer, ce_loss)
+            loss[batch_idx], acc[batch_idx], predicted, top_fp_values, top_fp_indices, top_fp_labels = iterate_batch(features, labels, model, optimizer, ce_loss)
+            top_10_fp_images = torch.where(torch.reshape(top_fp_values, (10,1,1,1)) > torch.reshape(top_10_fp_values, (10,1,1,1)), features[top_fp_indices], top_10_fp_images)
+            top_10_fp_labels = torch.where(top_fp_values > top_10_fp_values, top_fp_labels, top_10_fp_labels)
+            top_10_fp_values = torch.where(top_fp_values > top_10_fp_values, top_fp_values, top_10_fp_values)
+            display_10_images("top 10 false-positives", top_10_fp_images, train_data_transformed.classes, top_10_fp_labels.int())
             print(f"loss: {loss[batch_idx]}, acc: {acc[batch_idx]} ?> {min_threshold}")
             if acc[batch_idx] > min_threshold:
                 print(f"reached threshold {min_threshold}")
@@ -103,7 +106,7 @@ def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_r
         for epoch in tqdm(range(num_epochs), unit="epoch"):
             for batch_idx, (features, labels) in enumerate(train_dataloader):
                 features = features.type(torch.float)  # change type to float
-                batch_loss, batch_acc, _, _, _ = iterate_batch(features, labels, model, optimizer, ce_loss)
+                batch_loss, batch_acc, predicted, top_fp_values, top_fp_indices, top_fp_labels = iterate_batch(features, labels, model, optimizer, ce_loss)
             train_set_loss[epoch] = float(np.average(batch_loss))
             train_set_acc[epoch] = float(np.average(batch_acc))
             print(f"epoch avg loss: {round(float(np.average(train_set_loss[epoch])), 3)}, "
@@ -139,14 +142,15 @@ def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_r
         for batch_idx, (features, labels) in tqdm(enumerate(test_dataloader), unit="batch"):
             # change type to float (needed in forward pass)
             features = features.type(torch.float)
-            test_set_loss[batch_idx], test_set_acc[batch_idx], predicted, curr_top_false_positive_values, curr_top_false_positive_indices = iterate_batch(features, labels, model, optimizer, ce_loss, curr_top_false_positive_values, curr_top_false_positive_indices)
+            test_set_loss[batch_idx], test_set_acc[batch_idx], predicted, top_fp_values, top_fp_indices, top_fp_labels = iterate_batch(features, labels, model, optimizer, ce_loss)
             total_acc += predicted
+
 
     print(f"avg loss: {round(float(np.average(test_set_loss)), 3)}")
     print(f"avg acc: {round(float(np.average(test_set_acc)), 3)}")
     print(f"total accuracy: {total_acc} / {samples_num} = {round(total_acc.item() / samples_num, 3)}")
-    print(f"top false positive lables: {curr_top_false_positive_indices}")
-    print(f"top false positive values: {curr_top_false_positive_values}")
+    print(f"top false positive lables: {top_false_positive_indices}")
+    print(f"top false positive values: {top_false_positive_values}")
     render_accuracy_plot("Batch", test_batches, test_set_loss, test_set_acc,
                          f"CIFAR10 test set (ACC: {round(total_acc.item() / samples_num, 3)})")
 
