@@ -59,7 +59,7 @@ def render_accuracy_plot(unit, results, loss, acc, title):
     plt.show()
 
 
-def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_run=True):
+def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_run=True, ce_loss=nn.NLLLoss(), img_h=224, img_w=224):
     train_data_transformed = torchvision.datasets.CIFAR10(root=r"C:\work_openu\DL\temp\cifar-10",
                                                           train=True, download=False,
                                                           transform=transforms)
@@ -72,10 +72,9 @@ def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_r
     print(f"batche size: {batch_size}")
     print(f"batches num: {len(train_dataloader)}")
 
-    ce_loss = nn.NLLLoss()
     top_10_fp_values = torch.zeros(10)
     top_10_fp_labels = torch.zeros(10)
-    top_10_fp_images = torch.zeros(10, 3, 224, 224)
+    top_10_fp_images = torch.zeros(10, 3, img_h, img_w)
     if single_run:  # actually, it's a single epoch. it's the chart that is per batches..
         loss = torch.zeros(batches)
         acc = torch.zeros(batches)
@@ -144,7 +143,7 @@ def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_r
     total_acc = 0
     top_10_fp_values = torch.zeros(10)
     top_10_fp_labels = torch.zeros(10)
-    top_10_fp_images = torch.zeros(10, 3, 224, 224)
+    top_10_fp_images = torch.zeros(10, 3, img_h, img_w)
     with torch.no_grad():
         for batch_idx, (features, labels) in tqdm(enumerate(test_dataloader), unit="batch"):
             # change type to float (needed in forward pass)
@@ -290,10 +289,27 @@ if __name__ == '__main__':
 
     # train_and_test_cifar10(resnet18, cifar10_optimizer, cifar10_to_resnet18_transforms, 0.7, True)
 
+    #
+    #  my_res_model
+    #
+
+    #my_res_model_classifier = Linear(in_features=128, out_features=len(cifar10_classes), bias=False)
+    my_res_model_classifier = torch.nn.Sequential(
+        nn.Linear(128, 256),
+        nn.ReLU(),
+        nn.Linear(256, 10)
+    )
     my_res_model = nn.Sequential(ResBlockDownSamp(3, 32),
                                  ResBlockDownSamp(32, 64),
                                  ResBlockDownSamp(64, 128),
                                  nn.AdaptiveAvgPool2d(output_size=(1, 1)),
                                  nn.Flatten(),
-                                 Linear(in_features=128, out_features=len(cifar10_classes), bias=True))
-    train_and_test_cifar10(my_res_model, cifar10_optimizer, cifar10_to_resnet18_transforms, 0.7, True)
+                                 my_res_model_classifier)
+
+    my_res_model_transforms = T.Compose([
+        T.ToTensor(),
+        # T.Normalize(resnet18_preprocess_transforms.mean, resnet18_preprocess_transforms.std)])
+        T.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])])
+    my_res_model_optimizer = torch.optim.Adam(my_res_model.parameters(), lr=0.001)
+
+    train_and_test_cifar10(my_res_model, my_res_model_optimizer, my_res_model_transforms, 0.7, True, nn.CrossEntropyLoss(), img_h=32, img_w=32)
