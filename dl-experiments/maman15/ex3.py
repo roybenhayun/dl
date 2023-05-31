@@ -184,8 +184,10 @@ def display_10_images(title, images_arr, class_names, labels):
 
 
 class ResBlockDownSamp(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels=-1):
         super().__init__()
+        if out_channels == -1:
+            out_channels = in_channels * 2
         self.relu = nn.ReLU()
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, stride=2, bias=False)  #
         self.bn1 = nn.BatchNorm2d(out_channels)
@@ -288,9 +290,10 @@ if __name__ == '__main__':
 
     # train_and_test_cifar10(resnet18, cifar10_optimizer, cifar10_to_resnet18_transforms, 0.7, True)
 
-    my_res_model = nn.Sequential(ResBlockDownSamp(3, 6),
-                                 ResBlockDownSamp(6, 12),
-                                 ResBlockDownSamp(12, 24),
-                                 nn.AdaptiveAvgPool2d(512),  # (1228800x512 and 1228800x10) (1228800x512 and 12288000x10)
-                                 Linear(in_features=512, out_features=len(cifar10_classes), bias=True))
+    my_res_model = nn.Sequential(ResBlockDownSamp(3, 32),
+                                 ResBlockDownSamp(32, 64),
+                                 ResBlockDownSamp(64, 128),
+                                 nn.AdaptiveAvgPool2d(output_size=(1, 1)),
+                                 nn.Flatten(),
+                                 Linear(in_features=128, out_features=len(cifar10_classes), bias=True))
     train_and_test_cifar10(my_res_model, cifar10_optimizer, cifar10_to_resnet18_transforms, 0.7, True)
