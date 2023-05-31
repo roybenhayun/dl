@@ -59,6 +59,20 @@ def render_accuracy_plot(unit, results, loss, acc, title):
     plt.show()
 
 
+def display_10_images(title, images_arr, class_names, labels):
+    fig = plt.figure()
+    plt.suptitle(title)
+    for i in range(10):
+        ax = fig.add_subplot(2, 5, i + 1)
+        # plt.imshow requires the color dimension last. need to permute from [3, M, N] to [M, N, 3]
+        transposed_img = images_arr[i].permute(1, 2, 0)
+        plt.imshow(transposed_img)
+        ax.set_title(class_names[labels[i]])
+        ax.axes.get_xaxis().set_visible(False)
+        ax.axes.get_yaxis().set_visible(False)
+
+    plt.show()
+
 def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_run=True, ce_loss=nn.NLLLoss(), img_h=224, img_w=224):
     train_data_transformed = torchvision.datasets.CIFAR10(root=r"C:\work_openu\DL\temp\cifar-10",
                                                           train=True, download=False,
@@ -166,20 +180,6 @@ def train_and_test_cifar10(model, optimizer, transforms, min_threshold, single_r
     display_10_images("top 10 false-positives in test (images transformed)",
                       top_10_fp_images, train_data_transformed.classes, top_10_fp_labels.int())
 
-
-def display_10_images(title, images_arr, class_names, labels):
-    fig = plt.figure()
-    plt.suptitle(title)
-    for i in range(10):
-        ax = fig.add_subplot(2, 5, i + 1)
-        # plt.imshow requires the color dimension last. need to permute from [3, M, N] to [M, N, 3]
-        transposed_img = images_arr[i].permute(1, 2, 0)
-        plt.imshow(transposed_img)
-        ax.set_title(class_names[labels[i]])
-        ax.axes.get_xaxis().set_visible(False)
-        ax.axes.get_yaxis().set_visible(False)
-
-    plt.show()
 
 
 class ResBlockDownSamp(nn.Module):
@@ -297,7 +297,8 @@ if __name__ == '__main__':
     my_res_model_classifier = torch.nn.Sequential(
         nn.Linear(128, 256),
         nn.ReLU(),
-        nn.Linear(256, 10)
+        nn.Linear(256, 10),
+        # nn.LogSoftmax(dim=1)  # if not adding LogSoftmax, need to pass nn.CrossEntropyLoss as ce_loss. Adam with CrossEntropyLoss wo LogSoftmax seemed to succeed more within 1 Epoch
     )
     my_res_model = nn.Sequential(ResBlockDownSamp(3, 32),
                                  ResBlockDownSamp(32, 64),
@@ -309,7 +310,7 @@ if __name__ == '__main__':
     my_res_model_transforms = T.Compose([
         T.ToTensor(),
         # T.Normalize(resnet18_preprocess_transforms.mean, resnet18_preprocess_transforms.std)])
-        T.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])])
-    my_res_model_optimizer = torch.optim.Adam(my_res_model.parameters(), lr=0.001)
+        T.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])])  # TODO: mean and std from ChatGPT
+    my_res_model_optimizer = torch.optim.Adam(my_res_model.parameters(), lr=0.001)  # SGD did not reach 70% in 1st Epoch
 
-    train_and_test_cifar10(my_res_model, my_res_model_optimizer, my_res_model_transforms, 0.7, True, nn.CrossEntropyLoss(), img_h=32, img_w=32)
+    train_and_test_cifar10(my_res_model, my_res_model_optimizer, my_res_model_transforms, 0.7, True, nn.CrossEntropyLoss() ,img_h=32, img_w=32)
