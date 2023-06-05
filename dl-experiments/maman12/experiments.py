@@ -53,6 +53,38 @@ print_tensor("as5", as5)
 
 
 #
+# torch.sum(t, dim)
+#       dim (int or tuple of ints, optional) – the dimension or dimensions to reduce
+#
+
+x = torch.tensor([[ 0.9569, -0.6598],
+                  [ 0.9742, -1.0970],
+                  [-0.3451, 0.7615],
+                  [-0.8656, 1.8823],
+                  [ 0.6175, 0.2272],
+                  [ 0.9894, -0.8952],
+                  [ 1.0751, -1.2522]])
+
+x = torch.tensor([[ 1, 2],
+                  [ 1, 2],
+                  [ 1, 2],
+                  [ 1, 2],
+                  [ 1, 2],
+                  [ 1, 2],
+                  [ 1, 2]])
+print(x.shape, x)
+s1 = torch.sum(x)
+print(s1.shape, s1)
+s2 = torch.sum(x, dim=0)
+print(s2.shape, s2)
+s3 = torch.sum(x, dim=1)
+print(s3.shape, s3)
+
+b = torch.arange(2 * 3 * 4).view(2, 3, 4)
+print(b.shape, b)
+sb = torch.sum(b, (1,2))
+print(sb.shape, sb)
+#
 # torch.all
 # Tests if all elements in input evaluate to True.
 #
