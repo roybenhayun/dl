@@ -89,18 +89,23 @@ def get_gradient(scalar) -> dict:
 
 if __name__ == '__main__':
     print("------------------------------")
+    # tc: tensor([54.5981], grad_fn= < ExpBackward0 >)
+    # ta.grad: tensor([218.3926])
+    # tb.grad: tensor([54.5981])
+    # tc.grad: tensor([1.])
     ta = torch.tensor([2.], requires_grad=True)
     print(f"ta: {ta}")
     tb = torch.pow(ta, 2.)
     print(f"tb: {tb}")
-    tb.retain_grad()
+    #tb.retain_grad()
     tc = torch.exp(tb)
     print(f"tc: {tc}")
-    tc.retain_grad()
+    #tc.retain_grad()
     td = tc.backward()
     print("ta.grad: ", ta.grad)
     print("tb.grad: ", tb.grad)
     print("tc.grad: ", tc.grad)
+    assert tb.grad != None and tc.grad != None, "use .retain_grad() on the non-leaf Tensor"
     print("------------------------------")
 
     a = MyScalar(2)  # a = 2
