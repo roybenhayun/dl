@@ -87,23 +87,31 @@ class RNNClassifier(nn.Module):
 class DeepRNNClassifier(nn.Module):
     def __init__(self, embed_dim, hidden_dim, RNNlayers=2):
         super().__init__()
-        assert RNNlayers == 2
+        assert RNNlayers >= 1
         self.hidden_dim = hidden_dim
         self.embedding  = nn.Embedding(len(vocab), embed_dim)
-        self.rnn1    = MyRNNCell(embed_dim, hidden_dim)
-        self.rnn2    = MyRNNCell(hidden_dim, hidden_dim)      #
+        # self.rnn1    = MyRNNCell(embed_dim, hidden_dim)
+        # self.rnn2    = MyRNNCell(hidden_dim, hidden_dim)      #
         self.linear     = nn.Linear(hidden_dim, 2)
         self.logsoftmax = nn.LogSoftmax(dim=0)
+        # change #1
+        self.rnn_list = []
+        self.rnn_list.append(MyRNNCell(embed_dim, hidden_dim))
+        for i in range(RNNlayers - 1):
+            self.rnn_list.append(MyRNNCell(hidden_dim, hidden_dim))
 
     def forward(self, sentence_tokens):
-      self.rnn1.hidden_state = torch.zeros(self.hidden_dim)
-      self.rnn2.hidden_state = torch.zeros(self.hidden_dim)   #
+      for rnn_cell in self.rnn_list:
+          rnn_cell.hidden_state = torch.zeros(self.hidden_dim)
       for one_token in sentence_tokens:
         one_embedded_token = self.embedding(one_token)
-        self.rnn1(one_embedded_token)
-        self.rnn2(self.rnn1.hidden_state)                     #
+        self.rnn_list[0](one_embedded_token)
+        prev_hidden_state = self.rnn_list[0].hidden_state
+        for rnn_cell in self.rnn_list[1:]:
+            rnn_cell(prev_hidden_state)
+            prev_hidden_state = rnn_cell.hidden_state
 
-      feature_extractor_output = self.rnn2.hidden_state       #
+      feature_extractor_output = prev_hidden_state       #
       class_scores     = self.linear(feature_extractor_output)
       logprobs         = self.logsoftmax(class_scores)
       return logprobs
@@ -146,10 +154,9 @@ def print_rnn_structure(rnn_cell):
 def print_model_structure(model):
     print(f"model: {model}")
     # RNN cells
-    print(f"model.rnn1: {model.rnn1}")
-    print_rnn_structure(model.rnn1)
-    print(f"model.rnn2: {model.rnn2}")
-    print_rnn_structure(model.rnn2)
+    for idx, rnn_cell in enumerate(model.rnn_list):
+        print(f"model rnn_cell#{idx}: {rnn_cell}")
+        print_rnn_structure(rnn_cell)
     # Linear
     print(f"model.linear: {model.linear}")
     print(f"linear.weight.shape: {model.linear.weight.shape}")
