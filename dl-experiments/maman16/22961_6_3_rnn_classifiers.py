@@ -158,7 +158,7 @@ class LSTMclassifier(FasterDeepRNNClassifier):
       self.rnn_stack = nn.LSTM(embed_dim, hidden_dim, RNNlayers)
 
 model     = DeepRNNClassifier(10,5,2)
-optimizer = torch.optim.AdamW(model.parameters())
+optimizer = torch.optim.AdamW(model.parameters(), lr=0.1)  # NOTE: default lr=0.001 reached 68% max
 
 def print_rnn_structure(rnn_cell):
     print(f"input_linear.weight.shape: {rnn_cell.input_linear.weight.shape}")
