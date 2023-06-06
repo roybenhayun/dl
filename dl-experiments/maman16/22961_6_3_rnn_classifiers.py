@@ -92,16 +92,20 @@ class DeepRNNClassifier(nn.Module):
         self.embedding  = nn.Embedding(len(vocab), embed_dim)
         # self.rnn1    = MyRNNCell(embed_dim, hidden_dim)
         # self.rnn2    = MyRNNCell(hidden_dim, hidden_dim)      #
-        self.linear     = nn.Linear(hidden_dim, 2)
-        self.logsoftmax = nn.LogSoftmax(dim=0)
         # change #1
         self.rnn_list = []
         self.rnn_list.append(MyRNNCell(embed_dim, hidden_dim))
         for i in range(RNNlayers - 1):
+            print("add RNN cell")
             self.rnn_list.append(MyRNNCell(hidden_dim, hidden_dim))
+        print(f"num RNN cells: {len(self.rnn_list)}")
+        self.linear     = nn.Linear(hidden_dim, 2)
+        self.logsoftmax = nn.LogSoftmax(dim=0)
 
     def forward(self, sentence_tokens):
       # change #2
+      # self.rnn1.hidden_state = torch.zeros(self.hidden_dim)
+      # self.rnn2.hidden_state = torch.zeros(self.hidden_dim)
       for rnn_cell in self.rnn_list:
           rnn_cell.hidden_state = torch.zeros(self.hidden_dim)
       for one_token in sentence_tokens:
@@ -109,15 +113,12 @@ class DeepRNNClassifier(nn.Module):
         # change #3
         # self.rnn1(one_embedded_token)
         # self.rnn2(self.rnn1.hidden_state)                     #
-        rnn_cell = self.rnn_list[0]
-        rnn_cell(one_embedded_token)
-        prev_rnn_cell = rnn_cell
-        for rnn_cell in self.rnn_list[1:]:
-            rnn_cell(prev_rnn_cell.hidden_state)
-            prev_rnn_cell = rnn_cell
+        self.rnn_list[0](one_embedded_token)
+        for idx in range(len(self.rnn_list) - 1):
+            self.rnn_list[idx + 1](self.rnn_list[idx].hidden_state)
 
       # feature_extractor_output = self.rnn2.hidden_state       #
-      feature_extractor_output = rnn_cell.hidden_state       #
+      feature_extractor_output = self.rnn_list[-1].hidden_state       #
       class_scores     = self.linear(feature_extractor_output)
       logprobs         = self.logsoftmax(class_scores)
       return logprobs
