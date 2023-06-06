@@ -48,8 +48,9 @@ plt.plot(x,y);
 plt.show()
 
 class MyRNNCell(nn.Module):
-    def __init__(self, embed_dim, hidden_dim):
+    def __init__(self, embed_dim, hidden_dim, id=-1):
         super().__init__()
+        self.debug_id = id
         self.hidden_state = torch.zeros(hidden_dim)
         self.hidden_linear= nn.Linear(in_features = hidden_dim,
                                      out_features = hidden_dim)
@@ -94,31 +95,38 @@ class DeepRNNClassifier(nn.Module):
         # self.rnn2    = MyRNNCell(hidden_dim, hidden_dim)      #
         # change #1
         self.rnn_list = []
-        self.rnn_list.append(MyRNNCell(embed_dim, hidden_dim))
+        self.rnn_list.append(MyRNNCell(embed_dim, hidden_dim, id=0))
+        print(f"add RNN cell id:0")
         for i in range(RNNlayers - 1):
-            print("add RNN cell")
-            self.rnn_list.append(MyRNNCell(hidden_dim, hidden_dim))
+            print(f"add RNN cell id:{i+1}")
+            self.rnn_list.append(MyRNNCell(hidden_dim, hidden_dim, id=i+1))
         print(f"num RNN cells: {len(self.rnn_list)}")
-        self.linear     = nn.Linear(hidden_dim, 2)
+        self.linear = nn.Linear(hidden_dim, 2)
         self.logsoftmax = nn.LogSoftmax(dim=0)
 
     def forward(self, sentence_tokens):
+      print(f"* sentence tokens: {sentence_tokens.shape}")
       # change #2
       # self.rnn1.hidden_state = torch.zeros(self.hidden_dim)
       # self.rnn2.hidden_state = torch.zeros(self.hidden_dim)
       for rnn_cell in self.rnn_list:
           rnn_cell.hidden_state = torch.zeros(self.hidden_dim)
+          print(f"reset hidden_state: cell id:{rnn_cell.debug_id}")
       for one_token in sentence_tokens:
         one_embedded_token = self.embedding(one_token)
+        print(f"embed: {one_token} to one_embedded_token: {one_embedded_token.shape}")
         # change #3
         # self.rnn1(one_embedded_token)
         # self.rnn2(self.rnn1.hidden_state)                     #
         self.rnn_list[0](one_embedded_token)
+        print(f"update hidden_state, cell id:{self.rnn_list[0].debug_id} with embedded token")
         for idx in range(len(self.rnn_list) - 1):
             self.rnn_list[idx + 1](self.rnn_list[idx].hidden_state)
+            print(f"update hidden_state, cell id:{self.rnn_list[idx + 1].debug_id} with hidden_state of cell id:{self.rnn_list[idx].debug_id}")
 
       # feature_extractor_output = self.rnn2.hidden_state       #
       feature_extractor_output = self.rnn_list[-1].hidden_state       #
+      print(f"* extract feature output from cell id:{self.rnn_list[-1].debug_id}")
       class_scores     = self.linear(feature_extractor_output)
       logprobs         = self.logsoftmax(class_scores)
       return logprobs
@@ -162,7 +170,7 @@ def print_model_structure(model):
     print(f"model: {model}")
     # RNN cells
     for idx, rnn_cell in enumerate(model.rnn_list):
-        print(f"model rnn_cell#{idx}: {rnn_cell}")
+        print(f"model rnn_cell#{idx}, id:{rnn_cell.debug_id}: {rnn_cell}")
         print_rnn_structure(rnn_cell)
     # Linear
     print(f"model.linear: {model.linear}")
