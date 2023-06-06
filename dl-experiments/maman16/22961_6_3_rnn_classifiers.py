@@ -101,17 +101,23 @@ class DeepRNNClassifier(nn.Module):
             self.rnn_list.append(MyRNNCell(hidden_dim, hidden_dim))
 
     def forward(self, sentence_tokens):
+      # change #2
       for rnn_cell in self.rnn_list:
           rnn_cell.hidden_state = torch.zeros(self.hidden_dim)
       for one_token in sentence_tokens:
         one_embedded_token = self.embedding(one_token)
-        self.rnn_list[0](one_embedded_token)
-        prev_hidden_state = self.rnn_list[0].hidden_state
+        # change #3
+        # self.rnn1(one_embedded_token)
+        # self.rnn2(self.rnn1.hidden_state)                     #
+        rnn_cell = self.rnn_list[0]
+        rnn_cell(one_embedded_token)
+        prev_rnn_cell = rnn_cell
         for rnn_cell in self.rnn_list[1:]:
-            rnn_cell(prev_hidden_state)
-            prev_hidden_state = rnn_cell.hidden_state
+            rnn_cell(prev_rnn_cell.hidden_state)
+            prev_rnn_cell = rnn_cell
 
-      feature_extractor_output = prev_hidden_state       #
+      # feature_extractor_output = self.rnn2.hidden_state       #
+      feature_extractor_output = rnn_cell.hidden_state       #
       class_scores     = self.linear(feature_extractor_output)
       logprobs         = self.logsoftmax(class_scores)
       return logprobs
