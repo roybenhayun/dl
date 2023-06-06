@@ -45,7 +45,7 @@ tanh = nn.Tanh()
 x    = torch.arange(-2,2,0.1)
 y    = tanh(x)
 plt.plot(x,y);
-#plt.show()
+plt.show()
 
 class MyRNNCell(nn.Module):
     def __init__(self, embed_dim, hidden_dim):
@@ -85,8 +85,9 @@ class RNNClassifier(nn.Module):
       return logprobs
 
 class DeepRNNClassifier(nn.Module):
-    def __init__(self, embed_dim, hidden_dim):
+    def __init__(self, embed_dim, hidden_dim, RNNlayers=2):
         super().__init__()
+        assert RNNlayers == 2
         self.hidden_dim = hidden_dim
         self.embedding  = nn.Embedding(len(vocab), embed_dim)
         self.rnn1    = MyRNNCell(embed_dim, hidden_dim)
@@ -133,8 +134,31 @@ class LSTMclassifier(FasterDeepRNNClassifier):
       super().__init__(embed_dim, hidden_dim, RNNlayers)
       self.rnn_stack = nn.LSTM(embed_dim, hidden_dim, RNNlayers)
 
-model     = FasterDeepRNNClassifier(10,10,2)
+model     = DeepRNNClassifier(10,5,2)
 optimizer = torch.optim.AdamW(model.parameters())
+
+def print_rnn_structure(rnn_cell):
+    print(f"input_linear.weight.shape: {rnn_cell.input_linear.weight.shape}")
+    print(f"input_linear.bias.shape: {rnn_cell.input_linear.bias.shape}")
+    print(f"hidden_linear.weight.shape: {rnn_cell.hidden_linear.weight.shape}")
+    print(f"hidden_linear.bias.shape: {rnn_cell.hidden_linear.bias.shape}")
+
+def print_model_structure(model):
+    print(f"model: {model}")
+    # RNN cells
+    print(f"model.rnn1: {model.rnn1}")
+    print_rnn_structure(model.rnn1)
+    print(f"model.rnn2: {model.rnn2}")
+    print_rnn_structure(model.rnn2)
+    # Linear
+    print(f"model.linear: {model.linear}")
+    print(f"linear.weight.shape: {model.linear.weight.shape}")
+    print(f"linear.bias.shape: {model.linear.bias.shape}")
+
+    print(f"model.logsoftmax: {model.logsoftmax} - 'LogSoftmax' object has no attribute 'weight'")
+
+
+print_model_structure(model)
 
 def iterate_one_sentence(tokens, label, train_flag):
   if train_flag:
@@ -169,8 +193,8 @@ for epoch in range(epochs):
   avg_grad_norms[epoch] = grad_norm_temp.mean()
     
   acc = correct_predictions/num_samples
-  if epoch % 3 == 0:
-    print("Epoch",epoch," acc:",acc.item())
+  #if epoch % 3 == 0:
+  print("Epoch",epoch," acc:",acc.item())
 
 plt.plot(avg_grad_norms)
 plt.xlabel("Epoch")
@@ -184,6 +208,7 @@ for tokens, label in tqdm(zip(test_tokens, test_labels), total=len(test_tokens))
 test_acc = test_correct_predictions / len(test_tokens)
 
 print(acc, test_acc, sep="\n")
+print(f"acc: {acc}, test_acc: {test_acc}")
 
 preprocess = lambda x: torch.tensor(vocab(x.split()))
 example_sentences=["very good , not bad",
