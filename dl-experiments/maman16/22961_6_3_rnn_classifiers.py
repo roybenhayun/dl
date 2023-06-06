@@ -112,7 +112,16 @@ class DeepRNNClassifier(nn.Module):
       for rnn_cell in self.rnn_list:
           rnn_cell.hidden_state = torch.zeros(self.hidden_dim)
           # print(f"reset hidden_state: cell id:{rnn_cell.debug_id}")
-      for one_token in sentence_tokens:
+
+      T = sentence_tokens.shape[0]
+      t = len(self.rnn_list)
+      for token_idx, one_token in enumerate(sentence_tokens):
+        if token_idx < T - t:
+            self.requires_grad_(False)
+        else:
+            self.requires_grad_(True)
+        all_requires_grad_false = all(param.requires_grad is False for param in self.parameters())
+        # print(f"self.requires_grad {all_requires_grad_false} in token {token_idx} ?< {T - t}")
         one_embedded_token = self.embedding(one_token)
         # print(f"embed: {one_token} to one_embedded_token: {one_embedded_token.shape}")
         # change #3
