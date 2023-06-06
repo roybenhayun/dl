@@ -96,6 +96,11 @@ class DeepRNNClassifier(nn.Module):
         # change #1
         self.rnn_list = []
         self.rnn_list.append(MyRNNCell(embed_dim, hidden_dim, id=0))
+
+        def my_hook(x):
+            print(f"hook: {x}")
+            return x
+        self.rnn_list[0].input_linear.weight.register_hook(my_hook)
         print(f"add RNN cell id:0")
         for i in range(RNNlayers - 1):
             print(f"add RNN cell id:{i+1}")
