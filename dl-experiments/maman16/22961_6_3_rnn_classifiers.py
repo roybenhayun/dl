@@ -105,28 +105,28 @@ class DeepRNNClassifier(nn.Module):
         self.logsoftmax = nn.LogSoftmax(dim=0)
 
     def forward(self, sentence_tokens):
-      print(f"* sentence tokens: {sentence_tokens.shape}")
+      # print(f"* sentence tokens: {sentence_tokens.shape}")
       # change #2
       # self.rnn1.hidden_state = torch.zeros(self.hidden_dim)
       # self.rnn2.hidden_state = torch.zeros(self.hidden_dim)
       for rnn_cell in self.rnn_list:
           rnn_cell.hidden_state = torch.zeros(self.hidden_dim)
-          print(f"reset hidden_state: cell id:{rnn_cell.debug_id}")
+          # print(f"reset hidden_state: cell id:{rnn_cell.debug_id}")
       for one_token in sentence_tokens:
         one_embedded_token = self.embedding(one_token)
-        print(f"embed: {one_token} to one_embedded_token: {one_embedded_token.shape}")
+        # print(f"embed: {one_token} to one_embedded_token: {one_embedded_token.shape}")
         # change #3
         # self.rnn1(one_embedded_token)
         # self.rnn2(self.rnn1.hidden_state)                     #
         self.rnn_list[0](one_embedded_token)
-        print(f"update hidden_state, cell id:{self.rnn_list[0].debug_id} with embedded token")
+        # print(f"update hidden_state, cell id:{self.rnn_list[0].debug_id} with embedded token")
         for idx in range(len(self.rnn_list) - 1):
             self.rnn_list[idx + 1](self.rnn_list[idx].hidden_state)
-            print(f"update hidden_state, cell id:{self.rnn_list[idx + 1].debug_id} with hidden_state of cell id:{self.rnn_list[idx].debug_id}")
+            # print(f"update hidden_state, cell id:{self.rnn_list[idx + 1].debug_id} with hidden_state of cell id:{self.rnn_list[idx].debug_id}")
 
       # feature_extractor_output = self.rnn2.hidden_state       #
       feature_extractor_output = self.rnn_list[-1].hidden_state       #
-      print(f"* extract feature output from cell id:{self.rnn_list[-1].debug_id}")
+      # print(f"* extract feature output from cell id:{self.rnn_list[-1].debug_id}")
       class_scores     = self.linear(feature_extractor_output)
       logprobs         = self.logsoftmax(class_scores)
       return logprobs
@@ -225,12 +225,13 @@ plt.title("Average Inf Norm");
 plt.show()
 
 test_correct_predictions = torch.tensor([0.])
+print(f"run test set ({len(test_tokens)} sentences)")
 for tokens, label in tqdm(zip(test_tokens, test_labels), total=len(test_tokens)):
   test_correct_predictions += iterate_one_sentence(tokens, label, train_flag=False)
 test_acc = test_correct_predictions / len(test_tokens)
 
 print(acc, test_acc, sep="\n")
-print(f"acc: {acc}, test_acc: {test_acc}")
+print(f"train acc: {acc}, test set test_acc: {test_acc}")
 
 preprocess = lambda x: torch.tensor(vocab(x.split()))
 example_sentences=["very good , not bad",
