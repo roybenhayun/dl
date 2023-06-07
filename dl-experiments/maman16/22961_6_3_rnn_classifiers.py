@@ -45,7 +45,7 @@ tanh = nn.Tanh()
 x    = torch.arange(-2,2,0.1)
 y    = tanh(x)
 plt.plot(x,y);
-plt.show()
+# plt.show()
 
 class MyRNNCell(nn.Module):
     def __init__(self, embed_dim, hidden_dim, id=-1):
@@ -85,6 +85,16 @@ class RNNClassifier(nn.Module):
       logprobs           = self.logsoftmax(class_scores)
       return logprobs
 
+#
+# DeepRNNClassifier
+#
+
+
+def backward_hook(x):
+    print(f"backward_hook: {x}")
+    return x
+
+
 class DeepRNNClassifier(nn.Module):
     def __init__(self, embed_dim, hidden_dim, RNNlayers=2):
         super().__init__()
@@ -97,10 +107,7 @@ class DeepRNNClassifier(nn.Module):
         self.rnn_list = []
         self.rnn_list.append(MyRNNCell(embed_dim, hidden_dim, id=0))
 
-        def my_hook(x):
-            print(f"hook: {x}")
-            return x
-        self.rnn_list[0].input_linear.weight.register_hook(my_hook)
+        self.rnn_list[0].input_linear.weight.register_hook(backward_hook)
         print(f"add RNN cell id:0")
         for i in range(RNNlayers - 1):
             print(f"add RNN cell id:{i+1}")
@@ -145,34 +152,6 @@ class DeepRNNClassifier(nn.Module):
       logprobs         = self.logsoftmax(class_scores)
       return logprobs
 
-class FasterDeepRNNClassifier(nn.Module):
-    def __init__(self, embed_dim, hidden_dim, RNNlayers):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        self.embedding  = nn.Embedding(len(vocab), embed_dim)  
-        self.rnn_stack  = nn.RNN(embed_dim,                   #
-                                 hidden_dim,
-                                 RNNlayers)  
-        self.linear     = nn.Linear(hidden_dim, 2)
-        self.logsoftmax = nn.LogSoftmax(dim=0)
-
-    def forward(self, sentence_tokens):
-      all_embeddings         = self.embedding(sentence_tokens)
-      all_embeddings         = all_embeddings.unsqueeze(1)
-      hidden_state_history, _= self.rnn_stack(all_embeddings)
-
-      feature_extractor_output = hidden_state_history[-1,0,:]
-      class_scores     = self.linear(feature_extractor_output)
-      logprobs         = self.logsoftmax(class_scores)
-      return logprobs
-
-class LSTMclassifier(FasterDeepRNNClassifier):
-    def __init__(self, embed_dim, hidden_dim, RNNlayers):
-      super().__init__(embed_dim, hidden_dim, RNNlayers)
-      self.rnn_stack = nn.LSTM(embed_dim, hidden_dim, RNNlayers)
-
-model     = DeepRNNClassifier(10,5,2)
-optimizer = torch.optim.AdamW(model.parameters(), lr=0.1)  # NOTE: default lr=0.001 reached 68% max
 
 def print_rnn_structure(rnn_cell):
     print(f"input_linear.weight.shape: {rnn_cell.input_linear.weight.shape}")
@@ -194,15 +173,67 @@ def print_model_structure(model):
     print(f"model.logsoftmax: {model.logsoftmax} - 'LogSoftmax' object has no attribute 'weight'")
 
 
-print_model_structure(model)
+#
+# FasterDeepRNNClassifier
+#
 
-def iterate_one_sentence(tokens, label, train_flag):
+class FasterDeepRNNClassifier(nn.Module):
+    def __init__(self, embed_dim, hidden_dim, RNNlayers):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.embedding  = nn.Embedding(len(vocab), embed_dim)  
+        self.rnn_stack  = nn.RNN(embed_dim,                   #
+                                 hidden_dim,
+                                 RNNlayers)  
+        self.linear     = nn.Linear(hidden_dim, 2)
+        self.logsoftmax = nn.LogSoftmax(dim=0)
+
+    def forward(self, sentence_tokens):
+      all_embeddings         = self.embedding(sentence_tokens)
+      all_embeddings         = all_embeddings.unsqueeze(1)
+      all_embeddings.requires_grad_(True)
+      all_embeddings.retain_grad()
+      hidden_state_history, _= self.rnn_stack(all_embeddings[0:5])
+      hidden_state_history, _ = self.rnn_stack(all_embeddings[5:], hidden_state_history[-1])
+
+      feature_extractor_output = hidden_state_history[-1,0,:]
+      class_scores     = self.linear(feature_extractor_output)
+      logprobs         = self.logsoftmax(class_scores)
+      return logprobs, all_embeddings
+
+class LSTMclassifier(FasterDeepRNNClassifier):
+    def __init__(self, embed_dim, hidden_dim, RNNlayers):
+      super().__init__(embed_dim, hidden_dim, RNNlayers)
+      self.rnn_stack = nn.LSTM(embed_dim, hidden_dim, RNNlayers)
+
+
+
+t = 2
+#model     = DeepRNNClassifier(10,5,t)
+model     = FasterDeepRNNClassifier(10,5,t)
+optimizer = torch.optim.AdamW(model.parameters())  # NOTE: default lr=0.001 reached 68% max with DeepRNNClassifier, need 0.01 for 100%
+
+# print_model_structure(model)
+
+def iterate_one_sentence(sentence_tokens, label, train_flag, t=2):
+
+  tokens_embeddings = []
   if train_flag:
     model.train()  
     optimizer.zero_grad()
-    y_model = model(tokens)
+    #y_model = model(sentence_tokens)
+    T_m_t = max(sentence_tokens.shape[0] - t, t)  # ensure no overflow
+    for token_idx, one_token in enumerate(sentence_tokens):
+        if token_idx+1 < T_m_t:
+            model.requires_grad_(False)
+        else:
+            model.requires_grad_(True)
+        y_model, one_token_embedding = model(one_token.view(1))
+        tokens_embeddings.append(one_token_embedding)
+        # one_token_embedding.register_hook(backward_hook)
     loss    = -y_model[label] #Cross Entropy
     loss.backward()
+    print([tensor.grad for tensor in tokens_embeddings])
     optimizer.step()
   else:
     model.eval()
@@ -211,19 +242,24 @@ def iterate_one_sentence(tokens, label, train_flag):
   with torch.no_grad():
     predicted_labels = y_model.argmax()
     success = (predicted_labels == label)
-  return success
+  return success, tokens_embeddings
 
 #overfit a small batch to check if learning _can_ occur
 num_samples, epochs = 100, 10
 parameters = list(model.parameters())
 avg_grad_norms = torch.zeros(epochs)
+grad_computed = [0] * 40
 for epoch in range(epochs):
   correct_predictions = torch.tensor([0.])
   grad_norm_temp      = torch.zeros(num_samples)
   for idx in tqdm(range(num_samples)):
-    correct_predictions += iterate_one_sentence(train_tokens[idx],
-                                                train_labels[idx],
-                                                train_flag=True)
+    predictions, tokens_embeddings = iterate_one_sentence(train_tokens[idx], train_labels[idx], train_flag=True, t=t)
+    correct_predictions += predictions
+    tokens_embeddings_grads = [tensor.grad for tensor in tokens_embeddings]
+    for tidx, grad in enumerate(tokens_embeddings_grads):
+        if grad is not None:
+            grad_computed[tidx] += grad.max().item()
+
     norms = [p.grad.detach().abs().max() for p in parameters if p.grad is not None]
     grad_norm_temp[idx] = torch.max(torch.stack(norms))
   avg_grad_norms[epoch] = grad_norm_temp.mean()
