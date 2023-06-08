@@ -178,27 +178,35 @@ def print_model_structure(model):
 #
 
 class FasterDeepRNNClassifier(nn.Module):
-    def __init__(self, embed_dim, hidden_dim, RNNlayers):
+    def __init__(self, embed_dim, hidden_dim, RNNlayers, t=5):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.embedding  = nn.Embedding(len(vocab), embed_dim)  
-        self.rnn_stack  = nn.RNN(embed_dim,                   #
-                                 hidden_dim,
-                                 RNNlayers)  
+        self.rnn_stack  = nn.RNN(embed_dim, hidden_dim, RNNlayers)
         self.linear     = nn.Linear(hidden_dim, 2)
         self.logsoftmax = nn.LogSoftmax(dim=0)
+        self.t = t
+        assert t > 0
 
     def forward(self, sentence_tokens):
-      all_embeddings         = self.embedding(sentence_tokens)
-      all_embeddings         = all_embeddings.unsqueeze(1)
-      all_embeddings.requires_grad_(True)
+      all_embeddings = self.embedding(sentence_tokens)
+      all_embeddings = all_embeddings.unsqueeze(1)  # add single batch dimension
+      self.requires_grad_(False)
+      all_embeddings.requires_grad_(True)  # needed?
       all_embeddings.retain_grad()
-      hidden_state_history, _= self.rnn_stack(all_embeddings[0:5])
-      hidden_state_history, _ = self.rnn_stack(all_embeddings[5:], hidden_state_history[-1])
 
-      feature_extractor_output = hidden_state_history[-1,0,:]
-      class_scores     = self.linear(feature_extractor_output)
-      logprobs         = self.logsoftmax(class_scores)
+      T = len(sentence_tokens)
+      hidden_state_history, _ = self.rnn_stack(all_embeddings[0:T-self.t])  # IMPL-NOTE: the hidden-state will zero in the next pass
+      self.requires_grad_(True)
+      #hidden_state_for_second_pass = hidden_state_history[-1, 0, :].unsqueeze(0).unsqueeze(0)
+      hout_1 = hidden_state_history[-1, 0, :]
+      hout_2 = hout_1.unsqueeze(0)
+      hout_3 = torch.stack([hout_2, hout_2], 0)
+      hidden_state_history_second_pass, _ = self.rnn_stack(all_embeddings[T-self.t:], hout_3)
+
+      feature_extractor_output = hidden_state_history_second_pass[-1,0,:]
+      class_scores = self.linear(feature_extractor_output)
+      logprobs = self.logsoftmax(class_scores)
       return logprobs, all_embeddings
 
 class LSTMclassifier(FasterDeepRNNClassifier):
@@ -208,32 +216,22 @@ class LSTMclassifier(FasterDeepRNNClassifier):
 
 
 
-t = 2
+
 #model     = DeepRNNClassifier(10,5,t)
-model     = FasterDeepRNNClassifier(10,5,t)
+model     = FasterDeepRNNClassifier(embed_dim=10,hidden_dim=5,RNNlayers=2,t=3)
 optimizer = torch.optim.AdamW(model.parameters())  # NOTE: default lr=0.001 reached 68% max with DeepRNNClassifier, need 0.01 for 100%
 
 # print_model_structure(model)
 
-def iterate_one_sentence(sentence_tokens, label, train_flag, t=2):
+def iterate_one_sentence(sentence_tokens, label, train_flag):
 
-  tokens_embeddings = []
+  all_embeddings_grad = []
   if train_flag:
     model.train()  
     optimizer.zero_grad()
-    #y_model = model(sentence_tokens)
-    T_m_t = max(sentence_tokens.shape[0] - t, t)  # ensure no overflow
-    for token_idx, one_token in enumerate(sentence_tokens):
-        if token_idx+1 < T_m_t:
-            model.requires_grad_(False)
-        else:
-            model.requires_grad_(True)
-        y_model, one_token_embedding = model(one_token.view(1))
-        tokens_embeddings.append(one_token_embedding)
-        # one_token_embedding.register_hook(backward_hook)
-    loss    = -y_model[label] #Cross Entropy
+    y_model, all_embeddings = model(sentence_tokens)
+    loss = -y_model[label] #Cross Entropy
     loss.backward()
-    print([tensor.grad for tensor in tokens_embeddings])
     optimizer.step()
   else:
     model.eval()
@@ -242,23 +240,26 @@ def iterate_one_sentence(sentence_tokens, label, train_flag, t=2):
   with torch.no_grad():
     predicted_labels = y_model.argmax()
     success = (predicted_labels == label)
-  return success, tokens_embeddings
+  return success, all_embeddings
 
 #overfit a small batch to check if learning _can_ occur
 num_samples, epochs = 100, 10
 parameters = list(model.parameters())
 avg_grad_norms = torch.zeros(epochs)
-grad_computed = [0] * 40
+len_5_grad_computed = [0] * 5
+len_7_grad_computed = [0] * 7
+len_10_grad_computed = [0] * 10
 for epoch in range(epochs):
   correct_predictions = torch.tensor([0.])
   grad_norm_temp      = torch.zeros(num_samples)
   for idx in tqdm(range(num_samples)):
-    predictions, tokens_embeddings = iterate_one_sentence(train_tokens[idx], train_labels[idx], train_flag=True, t=t)
-    correct_predictions += predictions
-    tokens_embeddings_grads = [tensor.grad for tensor in tokens_embeddings]
-    for tidx, grad in enumerate(tokens_embeddings_grads):
-        if grad is not None:
-            grad_computed[tidx] += grad.max().item()
+    if train_tokens[idx].shape[0] == 7:
+        predictions, all_embeddings = iterate_one_sentence(train_tokens[idx], train_labels[idx], train_flag=True)
+        correct_predictions += predictions
+        tokens_embeddings_grads = [tensor.grad for tensor in all_embeddings]
+        for tidx, grad in enumerate(tokens_embeddings_grads):
+            if grad is not None:
+                len_7_grad_computed[tidx] += grad.max().item()
 
     norms = [p.grad.detach().abs().max() for p in parameters if p.grad is not None]
     grad_norm_temp[idx] = torch.max(torch.stack(norms))
