@@ -63,8 +63,8 @@ alpha = torch.tensor(0.1)
 err = 1
 iter_num = 0
 
-for step in range(200):  # change to 325 and see what happens
-    z.zero_grad()
+for step in range(150):  # change to 325 and see what happens
+    z.zero_grad()  # zero every time - otherwise will add to previous gradient
     y_model = torch.squeeze(y(z(X)))
     CE_loss = -1 / len(Y) * torch.sum(Y * torch.log(y_model) + (1 - Y) * torch.log(1 - y_model))
     CE_loss.backward()
@@ -72,7 +72,7 @@ for step in range(200):  # change to 325 and see what happens
     with torch.no_grad():
         z.weight -= alpha * z.weight.grad
         z.bias -= alpha * z.bias.grad
-    if step % 5 == 0:
+    if step % 10 == 0:
         draw_05_line(z.weight[0, 0], z.weight[0, 1], z.bias[0])
         plt.scatter(X[:, 0], X[:, 1], c=Y, cmap="Greys", edgecolor="black");
         plt.title(f"[step 3.{step}] X distribution")
@@ -91,7 +91,7 @@ decoder = nn.Linear(1,2)
 autoencoder = nn.Sequential(encoder, decoder)
 
 optimizer = torch.optim.SGD(autoencoder.parameters(), lr=0.1)
-MSELoss   = nn.MSELoss()
+MSELoss = nn.MSELoss()
 
 def iterate_epoch():
   optimizer.zero_grad()
@@ -167,6 +167,10 @@ count_gt = (predictions_X > 0.5).sum().item()
 count_leq = (predictions_X <= 0.5).sum().item()
 print(f"count_gt: {count_gt}, count_leq: {count_leq}")
 
+draw_05_line(encoder.weight[0,0], encoder.weight[0,1], encoder.bias[0])
+plt.scatter(X[:, 0], X[:, 1], c=Y, cmap="Greys", edgecolor="black");
+plt.title("[step 4] X distribution")
+plt.show()
 
 with torch.no_grad():
   reconstructed_X = autoencoder(X)
