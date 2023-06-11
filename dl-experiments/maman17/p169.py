@@ -8,6 +8,7 @@ X = torch.tensor(X).float()
 Y = torch.tensor(Y).long()
 X = (X - X.mean(dim=0)) / X.std(dim=0)
 plt.scatter(X[:, 0], X[:, 1], c=Y, cmap="Greys", edgecolor="black");
+plt.title("X distribution")
 plt.show()
 
 encoder = nn.Linear(2,1)
@@ -30,13 +31,72 @@ epoch_loss = torch.empty(epochs)
 for epoch_idx in range(epochs):
     epoch_loss[epoch_idx] = iterate_epoch().detach()
 
+plt.title("reconstructed X loss")
+plt.plot(epoch_loss);
+plt.show()
+
+
+class ClassificationHead(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.linear = nn.Linear(1, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, feature_extractor_output):
+        class_scores = self.linear(feature_extractor_output)
+        probs = self.sigmoid(class_scores)
+        return probs
+
+
+class LatentEncodingClassifier(nn.Module):
+    def __init__(self, encoder, classifier):
+        super().__init__()
+        self.encoder = encoder
+        self.classifier = classifier
+
+    def forward(self, X):
+        latent_encoding = encoder(X)
+        predictions = classifier_head(latent_encoding)
+        return predictions
+
+
+classifier_head = ClassificationHead()  # single feature
+classifying_encoder = LatentEncodingClassifier(encoder, classifier_head)
+
+optimizer = torch.optim.SGD(classifier_head.parameters(), lr=0.1)
+ce_loss = nn.NLLLoss()
+loss = torch.zeros(epochs)
+
+for epoch_idx in range(epochs):
+    optimizer.zero_grad()
+    predictions = classifying_encoder(X)
+    loss = ce_loss(predictions.view(100), Y)
+    loss.backward()
+    epoch_loss[epoch_idx] = loss.detach()
+    count_gt = (predictions > 0.5).sum().item()
+    count_leq = (predictions <= 0.5).sum().item()
+    print(f"{epoch_idx} > count_gt: {count_gt}, count_leq: {count_leq}")
+    optimizer.step()
+
+module_names = '>'.join([type(module).__name__ for name, module in classifying_encoder.named_modules()])
+plt.suptitle("train classifier head")
+plt.title(module_names)
 plt.plot(epoch_loss);
 plt.show()
 
 with torch.no_grad():
+  predictions_X = classifying_encoder(X)
+print(predictions_X.size())
+predictions_dist = torch.where(predictions_X > 0.5, 0, 1)
+count_gt = (predictions_X > 0.5).sum().item()
+count_leq = (predictions_X <= 0.5).sum().item()
+print(f"count_gt: {count_gt}, count_leq: {count_leq}")
+
+
+with torch.no_grad():
   reconstructed_X = autoencoder(X)
   encoded_X = encoder(X)
-encoded_X.size()
+print(encoded_X.size())
 
 fig,axes = plt.subplots(1,2)
 fig.set_figheight(8)
