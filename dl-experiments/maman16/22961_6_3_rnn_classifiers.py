@@ -191,18 +191,14 @@ class FasterDeepRNNClassifier(nn.Module):
     def forward(self, sentence_tokens):
       all_embeddings = self.embedding(sentence_tokens)
       all_embeddings = all_embeddings.unsqueeze(1)  # add single batch dimension
-      self.requires_grad_(False)
-      all_embeddings.requires_grad_(True)  # needed?
-      all_embeddings.retain_grad()
 
       T = len(sentence_tokens)
       hidden_state_history, _ = self.rnn_stack(all_embeddings[0:T-self.t])  # IMPL-NOTE: the hidden-state will zero in the next pass
-      self.requires_grad_(True)
       #hidden_state_for_second_pass = hidden_state_history[-1, 0, :].unsqueeze(0).unsqueeze(0)
       hout_1 = hidden_state_history[-1, 0, :]
       hout_2 = hout_1.unsqueeze(0)
       hout_3 = torch.stack([hout_2, hout_2], 0)
-      hidden_state_history_second_pass, _ = self.rnn_stack(all_embeddings[T-self.t:], hout_3)
+      hidden_state_history_second_pass, _ = self.rnn_stack(all_embeddings[T-self.t:], hout_3.detach())
 
       feature_extractor_output = hidden_state_history_second_pass[-1,0,:]
       class_scores = self.linear(feature_extractor_output)
