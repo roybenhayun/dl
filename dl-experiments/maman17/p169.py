@@ -8,8 +8,83 @@ X = torch.tensor(X).float()
 Y = torch.tensor(Y).long()
 X = (X - X.mean(dim=0)) / X.std(dim=0)
 plt.scatter(X[:, 0], X[:, 1], c=Y, cmap="Greys", edgecolor="black");
-plt.title("X distribution")
+
+def draw_05_line(w0, w1, b):
+  line = lambda x:-w0.detach()/w1.detach() * x - b.detach()/w1.detach()
+  x0   = torch.tensor([-2, 2])
+  x1   = line(x0)
+
+  plt.plot(x0, x1);
+
+
+#
+# -------------------------------------------------
+# 22961_2_1_3_single_neuron_training_pytorch_with_answers.ipynb
+#
+# see https://colab.research.google.com/github/Idan-Alter/OU-22961-Deep-Learning/blob/main/22961_2_1_3_single_neuron_training_pytorch_with_answers.ipynb#scrollTo=giIhvsL5WZeF
+# -------------------------------------------------
+#
+
+z = nn.Linear(2, 1)
+y = nn.Sigmoid()
+y(z(X[0,:]))
+with torch.no_grad():
+  z.weight[0,0], z.weight[0,1], z.bias[0] = (1, -1, 0.5)
+draw_05_line(z.weight[0,0], z.weight[0,1], z.bias[0])
+
+plt.title("[step 1] X distribution")
 plt.show()
+
+
+y_model = torch.squeeze(y(z(X)))
+CE_loss = -1/len(Y) * torch.sum(Y*torch.log(y_model) + (1-Y)*torch.log(1-y_model))
+print(CE_loss)
+CE_loss.backward()
+print(z.weight.grad, z.bias.grad, sep='\n')
+alpha = torch.tensor(0.1)
+
+z.zero_grad()
+y_model = torch.squeeze(y(z(X)))
+CE_loss = -1/len(Y) * torch.sum(Y*torch.log(y_model) + (1-Y)*torch.log(1-y_model))  # need otherwise crossing twice
+CE_loss.backward()
+with torch.no_grad():
+  z.weight -= alpha*z.weight.grad
+  z.bias -= alpha*z.bias.grad
+
+draw_05_line(z.weight[0,0], z.weight[0,1], z.bias[0])
+plt.scatter(X[:, 0], X[:, 1], c=Y, cmap="Greys", edgecolor="black");
+plt.title("[step 2] X distribution")
+plt.show()
+
+with torch.no_grad():
+    z.weight[0, 0], z.weight[0, 1], z.bias[0] = (1, -1, 0.5)
+
+alpha = torch.tensor(0.1)
+err = 1
+iter_num = 0
+
+for step in range(200):  # change to 325 and see what happens
+    z.zero_grad()
+    y_model = torch.squeeze(y(z(X)))
+    CE_loss = -1 / len(Y) * torch.sum(Y * torch.log(y_model) + (1 - Y) * torch.log(1 - y_model))
+    CE_loss.backward()
+
+    with torch.no_grad():
+        z.weight -= alpha * z.weight.grad
+        z.bias -= alpha * z.bias.grad
+    if step % 5 == 0:
+        draw_05_line(z.weight[0, 0], z.weight[0, 1], z.bias[0])
+        plt.scatter(X[:, 0], X[:, 1], c=Y, cmap="Greys", edgecolor="black");
+        plt.title(f"[step 3.{step}] X distribution")
+        plt.show()
+
+
+
+#
+# -------------------------------------------------
+# 22961_2_1_3_single_neuron_training_pytorch_with_answers.ipynb
+# -------------------------------------------------
+#
 
 encoder = nn.Linear(2,1)
 decoder = nn.Linear(1,2)
