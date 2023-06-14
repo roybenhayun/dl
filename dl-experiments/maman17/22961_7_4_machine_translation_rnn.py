@@ -134,6 +134,7 @@ class TrainingDecoder(nn.Module):
       self.RNNcell.hidden_state = context  # initialize hidden_state with Context (Encoder output)
       translated_tokens = [START_Token]  # signal <START>
       sentence_loss = 0
+      hits = 0
       for idx in range(len(tgt_tokens)-1):
         ##Teacher forcing:
         #previous_token  = tgt_tokens[idx]
@@ -144,12 +145,15 @@ class TrainingDecoder(nn.Module):
         translated_tokens.append(predicted_token.detach())  # append to target sentence (the above, index of tgt_embedding token)
 
         correct_token   = tgt_tokens[idx+1]                 #  compare with correct token
+        if correct_token == predicted_token:
+            hits += 1
         token_loss      = -logprobs[correct_token]          #
         sentence_loss  += token_loss                        #
 
         if predicted_token == END_Token:
           break
-      return translated_tokens, sentence_loss, correct_token == predicted_token
+      print(f"{hits} / {len(tgt_tokens)}")
+      return translated_tokens, sentence_loss, (hits / len(tgt_tokens))
 
 class TrainingTranslator(nn.Module):
       def __init__(self, embed_dim, hidden_dim, encoder_layers):
@@ -204,10 +208,10 @@ class Translator(nn.Module):
 def iterate_one_pair(src_tokens, tgt_tokens):
     model.train()
     optimizer.zero_grad()
-    output, loss, hit = model(src_tokens, tgt_tokens)
+    output, loss, hits = model(src_tokens, tgt_tokens)
     loss.backward()
     optimizer.step()
-    return loss.detach(), hit
+    return loss.detach(), hits
 
 model     = Translator(50,50,2)
 optimizer = torch.optim.AdamW(model.parameters())
@@ -220,12 +224,11 @@ for epoch in range(epochs):
   for idx in range(num_samples):
     # run model on a sentence and translation - Integer tokens of src_sents[idx], tgt_sents[idx]
     loss, hit = iterate_one_pair(src_tokens[idx], tgt_tokens[idx])
-    if hit:
-        hits += 1
+    hits += hit
     batch_loss_agg += loss
   epoch_loss = batch_loss_agg / num_samples
   if epoch % 2 == 0:
-    print("Epoch", epoch, " loss:", epoch_loss.item(), " Hits: ", hits)
+    print("Epoch", epoch, " loss:", epoch_loss.item(), " Hits: ", hits / num_samples)
 
 model.eval()
 with torch.no_grad():
