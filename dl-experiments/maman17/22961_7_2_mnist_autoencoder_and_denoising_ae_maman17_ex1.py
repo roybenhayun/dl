@@ -46,10 +46,10 @@ class Encoder(nn.Module):
     def forward(self, image):
       flattned = image.flatten(start_dim=1)
       Ae = self.linear_f1(flattned)
-      Ae = self.relu(Ae)
-      Be = self.linear_f2(Ae)
-      compressed_image = self.relu(Be)
-      return compressed_image
+      self.Ae = self.relu(Ae)
+      self.Be = self.linear_f2(self.Ae)
+      self.compressed_image = self.relu(self.Be)
+      return self.compressed_image
 
 class Decoder(nn.Module):
     def __init__(self, latent_dim):
@@ -60,8 +60,8 @@ class Decoder(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, compressed_image):
-      Bd = self.linear_f2I(compressed_image)
-      Bd = self.relu(Bd)
+      self.Bd = self.linear_f2I(compressed_image)
+      Bd = self.relu(self.Bd)
       Ad = self.linear_f1I(Bd)
       decoded = self.sigmoid(Ad)
       reconstructed_image = decoded.reshape(-1,1,28,28)
@@ -78,7 +78,9 @@ def inverse_mapping_loss(autoencoder, imgs_batch):
     flattned = imgs_batch.flatten(start_dim=1)
     inverse_f1_out = autoencoder[1].linear_f1I(autoencoder[0].linear_f1(flattned))  # linear_f1I should undo linear_f1
     inverse_f1_loss = MSELoss(flattned, inverse_f1_out)  # so flattned and inverse_f1_out should be close
-    return inverse_f1_loss
+    inverse_f2_out = autoencoder[1].linear_f2I(autoencoder[0].linear_f2(autoencoder[0].Ae))  # linear_f2I should undo linear_f2
+    inverse_f2_loss = MSELoss(autoencoder[0].Ae, inverse_f2_out)  # so flattned and inverse_f2_out should be close
+    return inverse_f1_loss + inverse_f2_loss  # TODO: add loss for two layers, not just one
 
 def iterate_batch(imgs):
   imgs = imgs.to(device)
