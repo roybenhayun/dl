@@ -40,26 +40,29 @@ class Encoder(nn.Module):
     def __init__(self, latent_dim):
         super().__init__()
         self.linear_f1 = nn.Linear(784,latent_dim)
-        # self.linear_f2 = nn.Linear(latent_dim, latent_dim)
+        self.linear_f2 = nn.Linear(latent_dim, latent_dim)
         self.relu = nn.ReLU()
 
     def forward(self, image):
       flattned = image.flatten(start_dim=1)
       Ae = self.linear_f1(flattned)
-      # Be = self.linear_f2(Ae)
-      compressed_image = self.relu(Ae)
+      Ae = self.relu(Ae)
+      Be = self.linear_f2(Ae)
+      compressed_image = self.relu(Be)
       return compressed_image
 
 class Decoder(nn.Module):
     def __init__(self, latent_dim):
         super().__init__()
-        # self.linear_f2I = nn.Linear(latent_dim, latent_dim) # should be inverse function of linear_f2
+        self.linear_f2I = nn.Linear(latent_dim, latent_dim) # should be inverse function of linear_f2
+        self.relu = nn.ReLU()
         self.linear_f1I = nn.Linear(latent_dim, 784)  # should be inverse function of linear_f1
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, compressed_image):
-      # Bd = self.linear_f2I(compressed_image)
-      Ad = self.linear_f1I(compressed_image)
+      Bd = self.linear_f2I(compressed_image)
+      Bd = self.relu(Bd)
+      Ad = self.linear_f1I(Bd)
       decoded = self.sigmoid(Ad)
       reconstructed_image = decoded.reshape(-1,1,28,28)
       return reconstructed_image
