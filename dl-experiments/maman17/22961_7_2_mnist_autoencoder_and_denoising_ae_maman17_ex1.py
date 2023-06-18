@@ -44,8 +44,9 @@ class Encoder(nn.Module):
         self.linear_f2 = nn.Linear(latent_dim,latent_dim)
         self.Be = None
         self.relu   = nn.ReLU()
+
     def forward(self, image):
-      flattned         = image.flatten(start_dim=1)
+      flattned = image.flatten(start_dim=1)
       self.Ae = self.linear_f1(flattned)
       self.Be = self.linear_f2(self.Ae)
       compressed_image = self.relu(self.Be)
@@ -54,11 +55,12 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, latent_dim):
         super().__init__()
-        self.linear_f2I    = nn.Linear(latent_dim, latent_dim) # should be inverse function of linear_f2
+        self.linear_f2I = nn.Linear(latent_dim, latent_dim) # should be inverse function of linear_f2
         self.Bd = None
-        self.linear_f1I    = nn.Linear(latent_dim, 784) # should be inverse function of linear_f1
+        self.linear_f1I = nn.Linear(latent_dim, 784)  # should be inverse function of linear_f1
         self.Ad = None
-        self.sigmoid   = nn.Sigmoid()
+        self.sigmoid = nn.Sigmoid()
+
     def forward(self, compressed_image):
       self.Bd = self.linear_f2I(compressed_image)
       self.Ad = self.linear_f1I(self.Bd)
@@ -72,35 +74,50 @@ autoencoder = nn.Sequential(Encoder(latent_dim),
 optimizer   = torch.optim.AdamW(autoencoder.parameters())
 MSELoss = nn.MSELoss()  # MSE measures proximity between results
 
+
+def inverse_mapping_loss(autoencoder, imgs_batch):
+    flattned = imgs_batch.flatten(start_dim=1)
+    inverse_f1_out = autoencoder[1].linear_f1I(autoencoder[0].linear_f1(flattned))  # linear_f1I should undo linear_f1
+    inverse_f1_loss = MSELoss(flattned, inverse_f1_out)  # so flattned and inverse_f1_out should be close
+    return inverse_f1_loss
+
 def iterate_batch(imgs):
   imgs = imgs.to(device)
   optimizer.zero_grad()
   reconstructed = autoencoder(imgs)
-  loss = MSELoss(reconstructed, imgs)
-  # TBD: measure between linear_f1-linear_f2I and linear_f2-linear_f2I - will it affect the gradient differently?
-  #loss = MSELoss(A1, A2)
-  #loss = MSELoss(B1, B2)
+  reconstructed_loss = MSELoss(reconstructed, imgs)
+  inverse_loss = inverse_mapping_loss(autoencoder, imgs)
+  loss = reconstructed_loss + (0.001 * inverse_loss)  # inverse_loss added, tuned.
   loss.backward()
   optimizer.step()
-  return loss
+  return loss, inverse_loss
 
 batches=len(train_dataloader)
-epochs = 1
+epochs = 20
 batch_loss = torch.empty(batches, device=device)
+batch_inverse_loss = torch.empty(batches, device=device)
 epoch_loss =torch.empty(epochs, device=device)
+epoch_inverse_loss =torch.empty(epochs, device=device)
 for epoch_idx in tqdm(range(epochs)):
   for batch_idx, (imgs, _) in enumerate(train_dataloader):
-    batch_loss[batch_idx] = iterate_batch(imgs)
+    batch_loss[batch_idx], batch_inverse_loss[batch_idx] = iterate_batch(imgs)
   with torch.no_grad():
     epoch_loss[epoch_idx] = batch_loss.mean()
+    epoch_inverse_loss[epoch_idx] = batch_inverse_loss.mean()
 
 """# display training results"""
 
 print(f"epoch_loss[epoch_idx]: {epoch_loss[epoch_idx]}")
+print(f"epoch_loss[epoch_idx]: {epoch_inverse_loss[epoch_idx]}")
 
+plt.title("Epoch loss")
 plt.plot(epoch_loss[:epoch_idx+1].cpu().detach());
+plt.plot(epoch_inverse_loss[:epoch_idx+1].cpu().detach());
+plt.show()
 
+plt.title("Batch loss")
 plt.plot(batch_loss.cpu().detach());
+plt.plot(batch_inverse_loss.cpu().detach());
 plt.show()
 
 
