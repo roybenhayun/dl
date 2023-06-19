@@ -71,43 +71,54 @@ class Decoder(nn.Module):
 class ConvEncoder(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(1, 32, 3, padding="same")
-        self.conv2 = nn.Conv2d(32, 32, 3, padding="same")
-        self.maxpool = nn.MaxPool2d(2)
+        self.conv1 = nn.Conv2d(1, 32, 3, stride=2)
+        # self.conv2 = nn.Conv2d(32, 32, 3, padding="same")
+        # self.maxpool = nn.MaxPool2d(2)
         self.relu = nn.ReLU()
-    def forward(self, image):
-      temp = self.relu(self.conv1(image))  # relu(torch.Size([1024, 32, 28, 28]))
-      temp = self.maxpool(temp)  # torch.Size([1024, 32, 14, 14])
-      temp = self.relu(self.conv2(temp))  # relu(torch.Size([1024, 32, 14, 14]))
-      feature_map = self.maxpool(temp)  # torch.Size([1024, 32, 7, 7])
+        self.f1 = self.conv1
+        #self.f2 = self.conv2
 
-      return feature_map
+    def forward(self, image):
+      self.Ae = self.conv1(image)   # torch.Size([1024, 32, 28, 28]) - note: can't keep the result here for MSE comparison as it already passed misc operations in the Encoder
+      temp = self.relu(self.Ae)     # relu(Ae)
+      # temp = self.maxpool(temp)     # torch.Size([1024, 32, 14, 14])
+      # self.Be = self.conv2(temp)    # torch.Size([1024, 32, 14, 14])
+      # temp = self.relu(self.Be)     # relu(Be)
+      # feature_map = self.maxpool(temp)  # torch.Size([1024, 32, 7, 7])
+
+      return temp
 
 class ConvDecoder(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.ConvTranspose2d(32, 32, 7, stride=2)
-        self.conv2 = nn.ConvTranspose2d(32, 1, 10)
+        # self.conv2I = nn.ConvTranspose2d(32, 32, 7, stride=2)
+        self.conv1I = nn.ConvTranspose2d(32, 1, 4, stride=2)  # TODO: kernel size 1 is meaningless?
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
+        self.f1I = self.conv1I
+        #self.f2I = self.conv2I
+
     def forward(self, feature_map):
-      temp = self.relu(self.conv1(feature_map))  # relu(torch.Size([1024, 32, 19, 19]))
-      reconstructed_image = self.sigmoid(self.conv2(temp))  # sigmoid(torch.Size([1024, 1, 28, 28]))
-      return reconstructed_image
+      # self.Bd = self.conv2I(feature_map)    # torch.Size([1024, 32, 19, 19])
+      # temp = self.relu(self.Bd)             # relu(Bd)
+      self.Ad = self.conv1I(feature_map)           # torch.Size([1024, 1, 28, 28])
+      reconstructed_image = self.sigmoid(self.Ad)  # sigmoid(Ad)
+      return reconstructed_image  # TODO: note the return must be [1024, 1, 28, 28], same as the imgs_batch
+
 
 latent_dim  = 10
-autoencoder = nn.Sequential(ConvEncoder(),
-                            ConvDecoder()).to(device)
+autoencoder = nn.Sequential(ConvEncoder(), ConvDecoder()).to(device)
 optimizer   = torch.optim.AdamW(autoencoder.parameters())
 MSELoss = nn.MSELoss()  # MSE measures proximity between results
 
+
 def inverse_conv_mapping_loss(autoencoder, imgs_batch):
-    flattned = imgs_batch.flatten(start_dim=1)
-    inverse_f1_out = autoencoder[1].linear_f1I(autoencoder[0].linear_f1(flattned))  # linear_f1I should undo linear_f1
-    inverse_f1_loss = MSELoss(flattned, inverse_f1_out)  # so flattned and inverse_f1_out should be close
-    inverse_f2_out = autoencoder[1].linear_f2I(autoencoder[0].linear_f2(autoencoder[0].Ae))  # linear_f2I should undo linear_f2
-    inverse_f2_loss = MSELoss(autoencoder[0].Ae, inverse_f2_out)  # so flattned and inverse_f2_out should be close
-    return inverse_f1_loss + inverse_f2_loss  # TODO: add loss for two layers, not just one
+    #flattned = imgs_batch.flatten(start_dim=1)
+    inverse_f1_out = autoencoder[1].f1I(autoencoder[0].f1(imgs_batch))  # f1I should undo f1
+    inverse_f1_loss = MSELoss(imgs_batch, inverse_f1_out)  # so imgs_batch and inverse_f1_out should be close
+    # inverse_f2_out = autoencoder[1].f2I(autoencoder[0].f2(inverse_f1_out))  # f2I should undo f2
+    # inverse_f2_loss = MSELoss(imgs_batch, inverse_f2_out)  # so Ae and inverse_f2_out should be close
+    return inverse_f1_loss  # TODO: add loss for two layers, not just one
 
 
 def inverse_mapping_loss(autoencoder, imgs_batch):
@@ -131,7 +142,7 @@ def iterate_batch(imgs):
   return loss, inverse_loss
 
 batches=len(train_dataloader)
-epochs = 20
+epochs = 12
 batch_loss = torch.empty(batches, device=device)
 batch_inverse_loss = torch.empty(batches, device=device)
 epoch_loss =torch.empty(epochs, device=device)
@@ -146,7 +157,7 @@ for epoch_idx in tqdm(range(epochs)):
 """# display training results"""
 
 print(f"epoch_loss[epoch_idx]: {epoch_loss[epoch_idx]}")
-print(f"epoch_loss[epoch_idx]: {epoch_inverse_loss[epoch_idx]}")
+print(f"epoch_inverse_loss[epoch_idx]: {epoch_inverse_loss[epoch_idx]}")
 
 plt.title("Epoch loss")
 plt.plot(epoch_loss[:epoch_idx+1].cpu().detach());
@@ -203,12 +214,12 @@ plt.show()
 
 """# Compare intermediate products and F(x) * F(x)^(-1) = X"""
 
-print(f"Encoder weights shape:")
-print(f"linear_f1.weight.shape: {autoencoder[0].linear_f1.weight.shape}, Encoder.Ae.shape: {autoencoder[0].Ae.shape}")
-print(f"linear_f2.weight.shape: {autoencoder[0].linear_f2.weight.shape}, Encoder.Be.shape: {autoencoder[0].Be.shape}")
-print("Decoder weights shape:")
-print(f"linear_f2I.weight.shape: {autoencoder[1].linear_f2I.weight.shape}, Decoder.Bd.shape: {autoencoder[1].Bd.shape}")
-print(f"linear_f1I.weight.shape: {autoencoder[1].linear_f1I.weight.shape}, Decoder.Ad.shape: {autoencoder[1].Ad.shape}")
+# print(f"Encoder weights shape:")
+# print(f"linear_f1.weight.shape: {autoencoder[0].linear_f1.weight.shape}, Encoder.Ae.shape: {autoencoder[0].Ae.shape}")
+# print(f"linear_f2.weight.shape: {autoencoder[0].linear_f2.weight.shape}, Encoder.Be.shape: {autoencoder[0].Be.shape}")
+# print("Decoder weights shape:")
+# print(f"linear_f2I.weight.shape: {autoencoder[1].linear_f2I.weight.shape}, Decoder.Bd.shape: {autoencoder[1].Bd.shape}")
+# print(f"linear_f1I.weight.shape: {autoencoder[1].linear_f1I.weight.shape}, Decoder.Ad.shape: {autoencoder[1].Ad.shape}")
 
 # print("Encoder weights:")
 # print(f"linear_f1.weight: {autoencoder[0].linear_f1.weight}")
