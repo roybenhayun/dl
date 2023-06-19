@@ -72,35 +72,23 @@ class ConvEncoder(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv1 = nn.Conv2d(1, 32, 3, stride=2)
-        # self.conv2 = nn.Conv2d(32, 32, 3, padding="same")
-        # self.maxpool = nn.MaxPool2d(2)
         self.relu = nn.ReLU()
         self.f1 = self.conv1
-        #self.f2 = self.conv2
 
     def forward(self, image):
       self.Ae = self.conv1(image)   # torch.Size([1024, 32, 28, 28]) - note: can't keep the result here for MSE comparison as it already passed misc operations in the Encoder
       temp = self.relu(self.Ae)     # relu(Ae)
-      # temp = self.maxpool(temp)     # torch.Size([1024, 32, 14, 14])
-      # self.Be = self.conv2(temp)    # torch.Size([1024, 32, 14, 14])
-      # temp = self.relu(self.Be)     # relu(Be)
-      # feature_map = self.maxpool(temp)  # torch.Size([1024, 32, 7, 7])
-
       return temp
 
 class ConvDecoder(nn.Module):
     def __init__(self):
         super().__init__()
-        # self.conv2I = nn.ConvTranspose2d(32, 32, 7, stride=2)
         self.conv1I = nn.ConvTranspose2d(32, 1, 4, stride=2)  # TODO: kernel size 1 is meaningless?
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
         self.f1I = self.conv1I
-        #self.f2I = self.conv2I
 
     def forward(self, feature_map):
-      # self.Bd = self.conv2I(feature_map)    # torch.Size([1024, 32, 19, 19])
-      # temp = self.relu(self.Bd)             # relu(Bd)
       self.Ad = self.conv1I(feature_map)           # torch.Size([1024, 1, 28, 28])
       reconstructed_image = self.sigmoid(self.Ad)  # sigmoid(Ad)
       return reconstructed_image  # TODO: note the return must be [1024, 1, 28, 28], same as the imgs_batch
@@ -113,11 +101,8 @@ MSELoss = nn.MSELoss()  # MSE measures proximity between results
 
 
 def inverse_conv_mapping_loss(autoencoder, imgs_batch):
-    #flattned = imgs_batch.flatten(start_dim=1)
     inverse_f1_out = autoencoder[1].f1I(autoencoder[0].f1(imgs_batch))  # f1I should undo f1
     inverse_f1_loss = MSELoss(imgs_batch, inverse_f1_out)  # so imgs_batch and inverse_f1_out should be close
-    # inverse_f2_out = autoencoder[1].f2I(autoencoder[0].f2(inverse_f1_out))  # f2I should undo f2
-    # inverse_f2_loss = MSELoss(imgs_batch, inverse_f2_out)  # so Ae and inverse_f2_out should be close
     return inverse_f1_loss  # TODO: add loss for two layers, not just one
 
 
