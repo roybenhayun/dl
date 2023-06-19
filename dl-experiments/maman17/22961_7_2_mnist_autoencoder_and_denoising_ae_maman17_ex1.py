@@ -67,11 +67,47 @@ class Decoder(nn.Module):
       reconstructed_image = decoded.reshape(-1,1,28,28)
       return reconstructed_image
 
+
+class ConvEncoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.Conv2d(1, 32, 3, padding="same")
+        self.conv2 = nn.Conv2d(32, 32, 3, padding="same")
+        self.maxpool = nn.MaxPool2d(2)
+        self.relu = nn.ReLU()
+    def forward(self, image):
+      temp = self.relu(self.conv1(image))  # relu(torch.Size([1024, 32, 28, 28]))
+      temp = self.maxpool(temp)  # torch.Size([1024, 32, 14, 14])
+      temp = self.relu(self.conv2(temp))  # relu(torch.Size([1024, 32, 14, 14]))
+      feature_map = self.maxpool(temp)  # torch.Size([1024, 32, 7, 7])
+
+      return feature_map
+
+class ConvDecoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.ConvTranspose2d(32, 32, 7, stride=2)
+        self.conv2 = nn.ConvTranspose2d(32, 1, 10)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+    def forward(self, feature_map):
+      temp = self.relu(self.conv1(feature_map))  # relu(torch.Size([1024, 32, 19, 19]))
+      reconstructed_image = self.sigmoid(self.conv2(temp))  # sigmoid(torch.Size([1024, 1, 28, 28]))
+      return reconstructed_image
+
 latent_dim  = 10
-autoencoder = nn.Sequential(Encoder(latent_dim),
-                            Decoder(latent_dim)).to(device)
+autoencoder = nn.Sequential(ConvEncoder(),
+                            ConvDecoder()).to(device)
 optimizer   = torch.optim.AdamW(autoencoder.parameters())
 MSELoss = nn.MSELoss()  # MSE measures proximity between results
+
+def inverse_conv_mapping_loss(autoencoder, imgs_batch):
+    flattned = imgs_batch.flatten(start_dim=1)
+    inverse_f1_out = autoencoder[1].linear_f1I(autoencoder[0].linear_f1(flattned))  # linear_f1I should undo linear_f1
+    inverse_f1_loss = MSELoss(flattned, inverse_f1_out)  # so flattned and inverse_f1_out should be close
+    inverse_f2_out = autoencoder[1].linear_f2I(autoencoder[0].linear_f2(autoencoder[0].Ae))  # linear_f2I should undo linear_f2
+    inverse_f2_loss = MSELoss(autoencoder[0].Ae, inverse_f2_out)  # so flattned and inverse_f2_out should be close
+    return inverse_f1_loss + inverse_f2_loss  # TODO: add loss for two layers, not just one
 
 
 def inverse_mapping_loss(autoencoder, imgs_batch):
@@ -87,7 +123,8 @@ def iterate_batch(imgs):
   optimizer.zero_grad()
   reconstructed = autoencoder(imgs)
   reconstructed_loss = MSELoss(reconstructed, imgs)
-  inverse_loss = inverse_mapping_loss(autoencoder, imgs)
+  #inverse_loss = inverse_mapping_loss(autoencoder, imgs)
+  inverse_loss = inverse_conv_mapping_loss(autoencoder, imgs)
   loss = reconstructed_loss + (0.001 * inverse_loss)  # inverse_loss added, tuned.
   loss.backward()
   optimizer.step()
