@@ -36,6 +36,12 @@ else:
   device = torch.device('cpu')
 print(device)
 
+
+# ----------------------------
+# Linear
+# ----------------------------
+
+
 class Encoder(nn.Module):
     def __init__(self, latent_dim):
         super().__init__()
@@ -68,33 +74,55 @@ class Decoder(nn.Module):
       return reconstructed_image
 
 
+# ----------------------------
+# Conv
+# ----------------------------
+
 class ConvEncoder(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(1, 32, 3, stride=2)
-        self.relu = nn.ReLU()
+        self.conv1   = nn.Conv2d(1, 32, (5,2), padding="same")  # "same" padding ensures output image same size
         self.f1 = self.conv1
+        #self.conv2   = nn.Conv2d(32, 32, (2,5), padding="same")
+        #self.f2 = self.conv2
+        # self.maxpool = nn.MaxPool2d(2)
+        self.relu    = nn.ReLU()
 
     def forward(self, image):
-      self.Ae = self.conv1(image)   # torch.Size([1024, 32, 28, 28]) - note: can't keep the result here for MSE comparison as it already passed misc operations in the Encoder
-      temp = self.relu(self.Ae)     # relu(Ae)
-      return temp
+        temp = self.relu(self.conv1(image))
+        #temp = self.maxpool(temp)
+        #temp = self.relu(self.conv2(temp))
+        #feature_map = self.maxpool(temp)
+        #return feature_map
+        return temp
 
 class ConvDecoder(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1I = nn.ConvTranspose2d(32, 1, 4, stride=2)  # TODO: kernel size 1 is meaningless?
-        self.relu = nn.ReLU()
-        self.sigmoid = nn.Sigmoid()
-        self.f1I = self.conv1I
+        #self.conv1 = nn.ConvTranspose2d(32, 32, 5, padding=2)
+        #self.f2I = self.conv1
+        self.conv2 = nn.ConvTranspose2d(32, 1, 9, padding=4)
+        self.f1I = self.conv2
+        self.relu      = nn.ReLU()
+        self.sigmoid   = nn.Sigmoid()
 
     def forward(self, feature_map):
-      self.Ad = self.conv1I(feature_map)           # torch.Size([1024, 1, 28, 28])
-      reconstructed_image = self.sigmoid(self.Ad)  # sigmoid(Ad)
-      return reconstructed_image  # TODO: note the return must be [1024, 1, 28, 28], same as the imgs_batch
+      #temp = self.relu(self.conv1(feature_map, output_size=feature_map.size()))
+      reconstructed_image = self.sigmoid(self.conv2(feature_map, output_size=feature_map.size()))
+      return reconstructed_image
 
 
-latent_dim  = 10
+# latent_dim  = 10
+# padding, output_padding = [0,0]
+# kernel_size = [3,3]
+# dilation = [1,1]
+# Hin = 28
+# Win = 28
+#
+# Hout=(Hin - 1)*stride[0]−2*padding[0]+dilation[0]*(kernel_size[0] - 1)+output_padding[0]+1
+# Wout=(Win - 1)*stride[1]−2*padding[1]+dilation[1]*(kernel_size[1] - 1)+output_padding[1]+1
+
+
 autoencoder = nn.Sequential(ConvEncoder(), ConvDecoder()).to(device)
 optimizer   = torch.optim.AdamW(autoencoder.parameters())
 MSELoss = nn.MSELoss()  # MSE measures proximity between results
@@ -103,7 +131,9 @@ MSELoss = nn.MSELoss()  # MSE measures proximity between results
 def inverse_conv_mapping_loss(autoencoder, imgs_batch):
     inverse_f1_out = autoencoder[1].f1I(autoencoder[0].f1(imgs_batch))  # f1I should undo f1
     inverse_f1_loss = MSELoss(imgs_batch, inverse_f1_out)  # so imgs_batch and inverse_f1_out should be close
-    return inverse_f1_loss  # TODO: add loss for two layers, not just one
+    #inverse_f2_out = autoencoder[1].f2I(autoencoder[0].f2(inverse_f1_out))  # f2I should undo f2
+    #inverse_f2_loss = MSELoss(imgs_batch, inverse_f2_out)
+    return inverse_f1_loss # + inverse_f2_loss
 
 
 def inverse_mapping_loss(autoencoder, imgs_batch):
@@ -144,12 +174,12 @@ for epoch_idx in tqdm(range(epochs)):
 print(f"epoch_loss[epoch_idx]: {epoch_loss[epoch_idx]}")
 print(f"epoch_inverse_loss[epoch_idx]: {epoch_inverse_loss[epoch_idx]}")
 
-plt.title("Epoch loss")
+plt.title("Conv ex1 epoch and inversability loss")
 plt.plot(epoch_loss[:epoch_idx+1].cpu().detach());
 plt.plot(epoch_inverse_loss[:epoch_idx+1].cpu().detach());
 plt.show()
 
-plt.title("Batch loss")
+plt.title("Conv ex1 Batch and inversability loss")
 plt.plot(batch_loss.cpu().detach());
 plt.plot(batch_inverse_loss.cpu().detach());
 plt.show()
