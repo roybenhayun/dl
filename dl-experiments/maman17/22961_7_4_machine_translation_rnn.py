@@ -19,15 +19,17 @@ tgt = "fr"
 dataset = ds.load_dataset("tatoeba", lang1=src, lang2=tgt)
 print(dataset)
 
-print(dataset["train"]["translation"][10])
-print(dataset["train"]["translation"][11])
-print(dataset["train"]["translation"][12])
-
-print(dataset["train"]["translation"][20])
-print(dataset["train"]["translation"][23])
-print(dataset["train"]["translation"][25])
-
 pairs_list = dataset["train"]["translation"]
+
+print(pairs_list[10])
+print(pairs_list[11])
+print(pairs_list[12])
+
+print(pairs_list[20])
+print(pairs_list[23])
+print(pairs_list[25])
+
+
 total = len(pairs_list)
 src_sents_unfiltered = [x[src].split() for x in pairs_list]  # split text to single words
 tgt_sents_unfiltered = [x[tgt].split() for x in pairs_list]
@@ -60,7 +62,7 @@ for idx in range(len(src_sents)):
   tgt_sents[idx] = ["<START>"]+tgt_sents[idx]+["<END>"]  # add START,END tokens in input sentence
 
 from torchtext.vocab import build_vocab_from_iterator
-# build_vocab_from_iterator maps every word to a single TOKEN
+# build_vocab_from_iterator: map word to integer TOKEN
 src_vocab = build_vocab_from_iterator(src_sents, specials=["<UNK>","<END>"])
 src_vocab.set_default_index(0)  # default index for unknowns (mapped to <UNK> above)
 print(len(src_vocab))
@@ -79,14 +81,14 @@ END_Token   = torch.tensor(tgt_vocab(["<END>"])[0])
 print(START_Token, END_Token)
 UNK_token = torch.tensor(tgt_vocab(["<UNK>"]))
 print(f"tgt <UNK>: { UNK_token}")
-END_token = torch.tensor(tgt_vocab(["<END>"]))
-print(f"tgt <END>: { END_token}")
 START_token = torch.tensor(tgt_vocab(["<START>"]))
 print(f"tgt <UNK>: { START_token}")
+END_token = torch.tensor(tgt_vocab(["<END>"]))
+print(f"tgt <END>: { END_token}")
 
 
-print(tgt_vocab.get_itos()[0:15])
-print(src_vocab.get_itos()[0:15])
+print(f"first 15 tokens in tgt_vocab: {tgt_vocab.get_itos()[0:15]}")
+print(f"first 15 tokens in src_vocab: {src_vocab.get_itos()[0:15]}")
 
 print("Source:", src_sents[0], src_tokens[0], sep="\n")
 print("Target:", tgt_sents[0], tgt_tokens[0], sep="\n")
@@ -112,14 +114,14 @@ class DecoderRNNCell(nn.Module):
         self.hidden_state  = torch.zeros(hidden_dim)
         self.RNNcell       = nn.RNNCell(embed_dim, hidden_dim)
         self.output_linear = nn.Linear(in_features=hidden_dim,
-                                  out_features=len(tgt_vocab))
+                                  out_features=len(tgt_vocab))  # the output features is the size of the Vocabulary
         self.logsoftmax    = nn.LogSoftmax(dim=0)
 
     def forward(self, one_embedded_token):
         new_state          = self.RNNcell(one_embedded_token,
                                            self.hidden_state)
-        tgt_token_scores   = self.output_linear(new_state)
-        tgt_token_logprobs = self.logsoftmax(tgt_token_scores)
+        tgt_token_scores   = self.output_linear(new_state)  # size of Vocabulary
+        tgt_token_logprobs = self.logsoftmax(tgt_token_scores)  # probability of every Integer Token in the Vocabulary
         self.hidden_state = new_state
         return tgt_token_logprobs
 
@@ -152,7 +154,7 @@ class TrainingDecoder(nn.Module):
 
         if predicted_token == END_Token:
           break
-      print(f"{hits} / {len(tgt_tokens)}")
+      # print(f"{hits} / {len(tgt_tokens)}")
       return translated_tokens, sentence_loss, (hits / len(tgt_tokens))
 
 class TrainingTranslator(nn.Module):
@@ -216,8 +218,12 @@ def iterate_one_pair(src_tokens, tgt_tokens):
 model     = Translator(50,50,2)
 optimizer = torch.optim.AdamW(model.parameters())
 
+print("-------------------------------------")
+print("train eval")
+print("-------------------------------------")
+
 #overfit a small batch to check if learning _can_ occur
-num_samples, epochs = 10, 200
+num_samples, epochs = 10, 11
 for epoch in range(epochs):
   batch_loss_agg = torch.tensor([0.])
   hits = 0
@@ -230,17 +236,21 @@ for epoch in range(epochs):
   if epoch % 2 == 0:
     print("Epoch", epoch, " loss:", epoch_loss.item(), " Hits: ", hits / num_samples)
 
+print("-------------------------------------")
+print("model eval")
+print("-------------------------------------")
+
 model.eval()
 with torch.no_grad():
   for idx in range(num_samples):
     a = model(src_tokens[idx])
     predicted_itos = [tgt_vocab.get_itos()[x.item()] for x in a]
     ground_truth   = [tgt_vocab.get_itos()[x.item()] for x in tgt_tokens[idx]]
-    print(predicted_itos, ground_truth)
+    print(f"predicted: {predicted_itos}, ground_truth: {ground_truth}")
 
 with torch.no_grad():
   for idx in range(num_samples, num_samples+5):
     a = model(src_tokens[idx])
     predicted_itos = [tgt_vocab.get_itos()[x.item()] for x in a]
     ground_truth   = [tgt_vocab.get_itos()[x.item()] for x in tgt_tokens[idx]]
-    print(predicted_itos,ground_truth)
+    print(f"predicted: {predicted_itos}, ground_truth: {ground_truth}")
