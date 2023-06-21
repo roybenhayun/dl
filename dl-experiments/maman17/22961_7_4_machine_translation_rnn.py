@@ -112,7 +112,7 @@ class DecoderRNNCell(nn.Module):
     def __init__(self, embed_dim, hidden_dim):
         super().__init__()
         self.hidden_state  = torch.zeros(hidden_dim)
-        self.RNNcell       = nn.RNNCell(embed_dim, hidden_dim)
+        self.RNNcell       = nn.RNNCell(embed_dim, hidden_dim)  # TBD: need to flip?
         self.output_linear = nn.Linear(in_features=hidden_dim,
                                   out_features=len(tgt_vocab))  # the output features is the size of the Vocabulary
         self.logsoftmax    = nn.LogSoftmax(dim=0)
@@ -137,7 +137,7 @@ class TrainingDecoder(nn.Module):
       translated_tokens = [START_Token]  # signal <START>
       sentence_loss = 0
       hits = 0
-      for idx in range(len(tgt_tokens)-1):
+      for idx in range(len(tgt_tokens)-1):  # IMPL-NOTE: tgt_tokens used to calc loss only
         ##Teacher forcing:
         #previous_token  = tgt_tokens[idx]
         previous_token  = translated_tokens[idx]
@@ -149,7 +149,7 @@ class TrainingDecoder(nn.Module):
         correct_token   = tgt_tokens[idx+1]                 #  compare with correct token
         if correct_token == predicted_token:
             hits += 1
-        token_loss      = -logprobs[correct_token]          #
+        token_loss      = -logprobs[correct_token]          # IMPL-NOTE: tgt_tokens used to calc loss only
         sentence_loss  += token_loss                        #
 
         if predicted_token == END_Token:
@@ -174,7 +174,7 @@ class Decoder(TrainingDecoder):
         super().__init__(embed_dim, hidden_dim)
     def forward(self,context, tgt_tokens=None, max_tokens=10):
       if self.training:
-        return super().forward(context, tgt_tokens)
+        return super().forward(context, tgt_tokens)  # IMPL-NOTE: tgt_tokens used to calc loss only
       else:
         with torch.no_grad():
           self.RNNcell.hidden_state = context
@@ -186,7 +186,7 @@ class Decoder(TrainingDecoder):
             predicted_token = logprobs.argmax()  # get predicted with max value
             translated_tokens.append(predicted_token.detach())
             if predicted_token == END_Token:
-              break
+              break  # gets here frequently with under-trained model
             current_token   = predicted_token  # update current_token based on last prediction
         return translated_tokens
 
@@ -196,10 +196,15 @@ class Translator(nn.Module):
         super().__init__()
         self.encoder = Encoder(embed_dim, hidden_dim, encoder_layers)
         self.decoder = Decoder(embed_dim, hidden_dim)
-      def forward(self,src_tokens, tgt_tokens=None):
-        context = self.encoder(src_tokens)  # get Context from Encoder
+      def forward(self,src_tokens, tgt_tokens=None, corrupted_src_tokens=None):
+        # 1. get Context from Encoder
+        if corrupted_src_tokens != None:
+            context = self.encoder(corrupted_src_tokens)  # DAE IMPL-NOTE: the Context is now "corrupted"
+        else:
+            context = self.encoder(src_tokens)
+        # 1. run Decoder with Context
         if self.training:  # [T1]
-          out=self.decoder(context, tgt_tokens)
+          out=self.decoder(context, tgt_tokens)  # DAE IMPL-NOTE: tgt_tokens used to calc loss, in both AE and DAE.
         else:
           out=self.decoder(context)
         return out
@@ -215,42 +220,81 @@ def iterate_one_pair(src_tokens, tgt_tokens):
     optimizer.step()
     return loss.detach(), hits
 
-model     = Translator(50,50,2)
+def iterate_one_pair_DAE(src_tokens, tgt_tokens, corrupted_src_tokens):
+    model.train()
+    optimizer.zero_grad()
+    output, loss, hits = model(src_tokens, tgt_tokens, corrupted_src_tokens)  # IMPL-NOTE: tgt_tokens used to calc loss down the stream
+    loss.backward()
+    optimizer.step()
+    return loss.detach(), hits
+
+sparsity_factor = 1.2  # increase in hidden state for sparsity
+model     = Translator(50, int(50 * sparsity_factor), 2)
 optimizer = torch.optim.AdamW(model.parameters())
 
 print("-------------------------------------")
 print("train eval")
 print("-------------------------------------")
 
+
+def get_corrupted_src_tokens(src_tokens):
+    # return src_tokens
+    rand_idx = torch.randint(low=0, high=len(src_tokens) - 1, size=(1,1)).item() # note the last token in src is the END token
+    corrupted_src_tokens = src_tokens.clone().detach()  # create a copy
+    corrupted_src_tokens[rand_idx] = torch.tensor(src_vocab(["<UNK>"]))  # "corrupt\zero 20%" ~= 1 out of 5 words is UNKNOWN
+    return corrupted_src_tokens
+
 #overfit a small batch to check if learning _can_ occur
-num_samples, epochs = 10, 11
+num_samples, epochs = 10, 100
 for epoch in range(epochs):
   batch_loss_agg = torch.tensor([0.])
   hits = 0
   for idx in range(num_samples):
     # run model on a sentence and translation - Integer tokens of src_sents[idx], tgt_sents[idx]
-    loss, hit = iterate_one_pair(src_tokens[idx], tgt_tokens[idx])
+    corrupted_src_tokens = get_corrupted_src_tokens(src_tokens[idx])
+    loss, hit = iterate_one_pair_DAE(src_tokens[idx], tgt_tokens[idx], corrupted_src_tokens)
     hits += hit
     batch_loss_agg += loss
   epoch_loss = batch_loss_agg / num_samples
-  if epoch % 2 == 0:
+  if epoch % 10 == 0:
     print("Epoch", epoch, " loss:", epoch_loss.item(), " Hits: ", hits / num_samples)
 
 print("-------------------------------------")
-print("model eval")
+print("model eval with known sentences")
 print("-------------------------------------")
+
+def calc_accuracy(predicted, ground_truth):
+    predicted = predicted[1:-1]  # ignore <START>, <END>
+    ground_truth = ground_truth[1:-1]  # ignore <START>, <END>
+    same_len = len(predicted) == len(ground_truth)
+    hits = 0
+    for idx, expected_word in enumerate(ground_truth):
+        if len(predicted) > idx and predicted[idx] == expected_word:
+            hits = hits + 1
+    return same_len, hits / len(ground_truth)
+
 
 model.eval()
 with torch.no_grad():
   for idx in range(num_samples):
-    a = model(src_tokens[idx])
+    corrupted_src_tokens = get_corrupted_src_tokens(src_tokens[idx])
+    a = model(corrupted_src_tokens)
     predicted_itos = [tgt_vocab.get_itos()[x.item()] for x in a]
     ground_truth   = [tgt_vocab.get_itos()[x.item()] for x in tgt_tokens[idx]]
-    print(f"predicted: {predicted_itos}, ground_truth: {ground_truth}")
+    same_len, acc = calc_accuracy(predicted_itos, ground_truth)
+    print(f"predicted: {predicted_itos}, ground_truth: {ground_truth}, [len: {same_len}, acc: {acc}]")
+
+print("-------------------------------------")
+print("model eval with unknown sentences")
+print("-------------------------------------")
 
 with torch.no_grad():
   for idx in range(num_samples, num_samples+5):
-    a = model(src_tokens[idx])
+    corrupted_src_tokens = get_corrupted_src_tokens(src_tokens[idx])
+    a = model(corrupted_src_tokens)
     predicted_itos = [tgt_vocab.get_itos()[x.item()] for x in a]
     ground_truth   = [tgt_vocab.get_itos()[x.item()] for x in tgt_tokens[idx]]
-    print(f"predicted: {predicted_itos}, ground_truth: {ground_truth}")
+    same_len, acc = calc_accuracy(predicted_itos, ground_truth)
+    print(f"predicted: {predicted_itos}, ground_truth: {ground_truth}, [len: {same_len}, acc: {acc}]")
+
+
