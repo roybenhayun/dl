@@ -316,7 +316,7 @@ class ClassificationHead(nn.Module):
     def __init__(self, in_features):
         super().__init__()
         self.linear = nn.Linear(in_features, 2)  # output 2 options
-        self.logsoftmax = nn.LogSoftmax(dim=0)  # TODO: FasterDeepRNNClassifier used LogSoftmax. still, maybe use Sigmoid as in p169.py.
+        self.logsoftmax = nn.LogSoftmax(dim=0)  # FasterDeepRNNClassifier used LogSoftmax
 
     def forward(self, feature_extractor_output_context, ignored_tgt_tokens=None):  # ignore the tgt_tokens which Translator passes to Decoder(TrainingDecoder)
         class_scores = self.linear(feature_extractor_output_context)
