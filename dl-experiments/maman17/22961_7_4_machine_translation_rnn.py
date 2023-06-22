@@ -11,7 +11,6 @@ Original file is located at
 
 import torch
 from torch import nn
-import torch.nn.functional as F
 import datasets as ds
 
 src = "en"
@@ -232,11 +231,12 @@ def iterate_one_pair_DAE(src_tokens, tgt_tokens, corrupted_src_tokens):
 
 sparsity_factor = 1.2  # increase in hidden state for sparsity
 model_hidden_dim = int(50 * sparsity_factor)
-model     = Translator(50, model_hidden_dim, 2)
+model = Translator(50, model_hidden_dim, 2)
+print("DAE Translator: ", model)
 optimizer = torch.optim.AdamW(model.parameters())
 
 print("-------------------------------------")
-print("train eval")
+print("DAE training")
 print("-------------------------------------")
 
 
@@ -248,7 +248,7 @@ def get_corrupted_src_tokens(src_tokens):
     return corrupted_src_tokens
 
 #overfit a small batch to check if learning _can_ occur
-num_samples, epochs = 10, 10
+num_samples, epochs = 10, 200
 for epoch in range(epochs):
   batch_loss_agg = torch.tensor([0.])
   hits = 0
@@ -259,11 +259,11 @@ for epoch in range(epochs):
     hits += hit
     batch_loss_agg += loss
   epoch_loss = batch_loss_agg / num_samples
-  if epoch % 2 == 0:
+  if epoch % 10 == 0:
     print("Epoch", epoch, " loss:", epoch_loss.item(), " Hits: ", hits / num_samples)
 
 print("-------------------------------------")
-print("model eval with known sentences")
+print("DAE model eval with known sentences")
 print("-------------------------------------")
 
 def calc_accuracy(predicted, ground_truth):
@@ -288,7 +288,7 @@ with torch.no_grad():
     print(f"predicted: {predicted_itos}, ground_truth: {ground_truth}, [len: {same_len}, acc: {acc}]")
 
 print("-------------------------------------")
-print("model eval with unknown sentences")
+print("DAE model eval with unknown sentences")
 print("-------------------------------------")
 
 with torch.no_grad():
@@ -347,7 +347,7 @@ def iterate_sentence_sentiment(src_tokens, sentiment_label, train_flag=True):
     if train_flag:
         model.train()
         optimizer.zero_grad()
-        predictions = model(src_tokens, tgt_tokens)
+        predictions = model(src_tokens, tgt_tokens=None)  # pass None for API compatability
         loss = -predictions[sentiment_label]  # Cross Entropy
         # TODO: loss = ce_loss(predictions.view(1), Ys)
         loss.backward()
@@ -355,17 +355,28 @@ def iterate_sentence_sentiment(src_tokens, sentiment_label, train_flag=True):
     else:
         model.eval()
         predictions = model(src_tokens)
+        loss = None
         model.train()
     with torch.no_grad():
         predicted_labels = predictions.argmax()
         success = (predicted_labels == sentiment_label)
-    return success
+    return success, loss
 
 
 sst2_dataset = ds.load_dataset("glue", "sst2")
 
 sst2_sentence_list = sst2_dataset["train"]["sentence"]
 sst2_labels_list = sst2_dataset["train"]["label"]
+print(f"total number: {len(sst2_sentence_list)}")
+
+# filter with max 5 words - TBD if required.
+filtered_indices = [index for index, sentence in enumerate(sst2_sentence_list) if len(sentence.split()) <= 5]
+sst2_filtered_sentence_list = [sst2_sentence_list[index] for index in filtered_indices]
+sst2_filtered_labels_list = [sst2_labels_list[index] for index in filtered_indices]
+sst2_sentence_list = sst2_filtered_sentence_list
+sst2_labels_list = sst2_filtered_labels_list
+print(f"filtered number: {len(sst2_sentence_list)}")
+
 
 sst2_tokenized = list(map(lambda x: x.split(), sst2_sentence_list))
 
@@ -378,30 +389,72 @@ print("sst2_sentence_list", *sst2_sentence_list[1:4], sep="\n")
 print("sst2_integer_tokens", *sst2_integer_tokens[1:4], sep="\n")
 print("sst2_label_tensors", *sst2_label_tensors[1:4], sep="\n")
 
+# split to train and test sets
 sst2_test_split = len(sst2_integer_tokens) * 8//10
 sst2_train_tokens = sst2_integer_tokens[:sst2_test_split]
 sst2_train_labels = sst2_label_tensors[:sst2_test_split]
 sst2_test_tokens = sst2_integer_tokens[sst2_test_split:]
 sst2_test_labels = sst2_label_tensors[sst2_test_split:]
 
+
+print("-------------------------------------")
+print("transfer learning training")
+print("-------------------------------------")
+
 src_tokens = sst2_train_tokens
 sentiment_labels = sst2_train_labels
 
-num_samples, epochs = 10, 10
+num_samples, epochs = 10, 200  # note: this is pseudo-epoch
+
 for epoch in range(epochs):
   batch_loss_agg = torch.tensor([0.])
   hits = 0
   for idx in range(num_samples):
     # run model on a sentence and translation - Integer tokens of src_sents[idx], tgt_sents[idx]
-    hit = iterate_sentence_sentiment(src_tokens[idx], sentiment_labels[idx], True)
+    hit, loss = iterate_sentence_sentiment(src_tokens[idx], sentiment_labels[idx], True)
     hits += hit
     batch_loss_agg += loss
   epoch_loss = batch_loss_agg / num_samples
-  if epoch % 2 == 0:
+  if epoch % 10 == 0:
     print("Epoch", epoch, " loss:", epoch_loss.item(), " Hits: ", hits / num_samples)
 
+
 print("-------------------------------------")
-print("transfer learning eval")
+print("transfer learning eval on known sentences")
 print("-------------------------------------")
-# TODO: ...
+
+src_tokens = sst2_train_tokens
+sentiment_labels = sst2_train_labels
+
+model.eval()
+with torch.no_grad():
+    hits = 0
+    for idx in range(num_samples):
+        success, loss = iterate_sentence_sentiment(src_tokens[idx], sentiment_labels[idx], False)
+        print(f"{sst2_sentence_list[sst2_test_split + idx]}, {sentiment_labels[idx]}, success={success}")
+        if success:
+            hits += 1
+    print(f"Hits: {hits} from {num_samples}")
+
+
+
+
+print("-------------------------------------")
+print("transfer learning eval on unknown sentences")
+print("-------------------------------------")
+
+src_tokens = sst2_test_tokens
+sentiment_labels = sst2_test_labels
+
+model.eval()
+with torch.no_grad():
+    hits = 0
+    for idx in range(num_samples):
+        success, loss = iterate_sentence_sentiment(src_tokens[idx], sentiment_labels[idx], False)
+        print(f"{sst2_sentence_list[sst2_test_split + idx]}, {sentiment_labels[idx]}, success={success}")
+        if success:
+            hits += 1
+    print(f"Hits: {hits} from {num_samples}")
+
+
 

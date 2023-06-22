@@ -63,7 +63,14 @@ alpha = torch.tensor(0.1)
 err = 1
 iter_num = 0
 
-for step in range(150):  # change to 325 and see what happens
+# run on single circle only
+Xs = X[0:1,]
+Ys = Y[0:1,]
+Xorig = X
+Yorig = Y
+X = Xs
+Y = Ys
+for step in range(1):  # change to 325 and see what happens
     z.zero_grad()  # zero every time - otherwise will add to previous gradient
     y_model = torch.squeeze(y(z(X)))
     CE_loss = -1 / len(Y) * torch.sum(Y * torch.log(y_model) + (1 - Y) * torch.log(1 - y_model))
@@ -78,7 +85,22 @@ for step in range(150):  # change to 325 and see what happens
         plt.title(f"[step 3.{step}] X distribution")
         plt.show()
 
+# show predictions based on training
+with torch.no_grad():
+  y_model = torch.squeeze(y(z(Xorig)))
+print(y_model.size())
+predictions_dist = torch.where(y_model > 0.5, 0, 1)
+count_gt = (y_model > 0.5).sum().item()
+count_leq = (y_model <= 0.5).sum().item()
+print(f"count_gt: {count_gt}, count_leq: {count_leq}")
 
+draw_05_line(z.weight[0, 0], z.weight[0, 1], z.bias[0])
+plt.scatter(Xorig[:, 0], Xorig[:, 1], c=Yorig, cmap="Greys", edgecolor="black");
+plt.title(f"[step 3.9] X with NN trained on single circle")
+plt.show()
+
+X = Xorig
+Y = Yorig
 
 #
 # -------------------------------------------------
@@ -142,10 +164,10 @@ optimizer = torch.optim.SGD(classifier_head.parameters(), lr=0.1)
 ce_loss = nn.NLLLoss()
 loss = torch.zeros(epochs)
 
-for epoch_idx in range(epochs):
+for epoch_idx in range(1):
     optimizer.zero_grad()
-    predictions = classifying_encoder(X)
-    loss = ce_loss(predictions.view(100), Y)
+    predictions = classifying_encoder(Xs)
+    loss = ce_loss(predictions.view(1), Ys)
     loss.backward()
     epoch_loss[epoch_idx] = loss.detach()
     count_gt = (predictions > 0.5).sum().item()
@@ -154,7 +176,7 @@ for epoch_idx in range(epochs):
     optimizer.step()
 
 module_names = '>'.join([type(module).__name__ for name, module in classifying_encoder.named_modules()])
-plt.suptitle("train classifier head")
+plt.suptitle("train classifier head on training set, with single circle")
 plt.title(module_names)
 plt.plot(epoch_loss);
 plt.show()
@@ -169,7 +191,7 @@ print(f"count_gt: {count_gt}, count_leq: {count_leq}")
 
 draw_05_line(encoder.weight[0,0], encoder.weight[0,1], encoder.bias[0])
 plt.scatter(X[:, 0], X[:, 1], c=Y, cmap="Greys", edgecolor="black");
-plt.title("[step 4] X distribution")
+plt.title("[step 4] X LatentEncodingClassifier test set results with single circle")
 plt.show()
 
 with torch.no_grad():

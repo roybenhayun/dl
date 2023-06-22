@@ -7,7 +7,7 @@ Original file is located at
     https://colab.research.google.com/github/Idan-Alter/OU-22961-Deep-Learning/blob/main/22961_7_5_attention.ipynb
 """
 
-pip install datasets
+
 
 import torch
 from torch import nn
@@ -143,7 +143,7 @@ src_words  = ["woman", "man", "bicycle", "queen", "house"]
 values     = glove_embedder.get_vecs_by_tokens(src_words)
 keys       = values
 query      = glove_embedder.get_vecs_by_tokens("king")
-search_result, attn_weights = dot_attention(query, keys, values)
+search_result, attn_weights = dot_attention(query, keys, values)  # keys and values are both same Glove vectors
 print(search_result.size(), search_result.dtype)
 print(attn_weights)
 
@@ -189,7 +189,7 @@ class ContextRNNCell(nn.Module):
         Z1        = self.input_linear(one_embedded_token)
         Z2        = self.hidden_linear(hidden_state)
         Z3        = self.ctxt_linear(context)
-        Y         = Z1 + Z2 + Z3
+        Y         = Z1 + Z2 + Z3  # sum 3 inputs
         new_state = self.activation(Y)
         return new_state
 
@@ -221,7 +221,7 @@ class AttnDecoder(nn.Module):
                                            embed_dim)
         self.RNNcell        = AttnDecoderRNNCell(embed_dim,
                                                  hidden_dim)
-        self.attn_layer     = dot_attention
+        self.attn_layer     = dot_attention  # the attention layer is the dot_attention function
     def forward(self, annotations, tgt_tokens):
       self.RNNcell.hidden_state = torch.zeros(self.hidden_dim)
       keys   = annotations
@@ -232,9 +232,9 @@ class AttnDecoder(nn.Module):
         previous_token  = translated_tokens[idx]
         embedded_token  = self.tgt_embedding(previous_token)
         query           = self.RNNcell.hidden_state
-        attn_context,_  = self.attn_layer(query, keys, values)  #
+        attn_context,_  = self.attn_layer(query, keys, values)  # create the private context vector
         logprobs        = self.RNNcell(embedded_token,
-                                       attn_context)
+                                       attn_context)  # give the private context vector to the RNN
         predicted_token = logprobs.argmax()
         translated_tokens.append(predicted_token.detach())
 
