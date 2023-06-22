@@ -93,7 +93,7 @@ print(f"first 15 tokens in src_vocab: {src_vocab.get_itos()[0:15]}")
 print("Source:", src_sents[0], src_tokens[0], sep="\n")
 print("Target:", tgt_sents[0], tgt_tokens[0], sep="\n")
 
-# TODO: compare to FasterDeepRNNClassifier in unit 6
+# TODO: compare to FasterDeepRNNClassifier in 22961_6_3_RNN_classifiers (unit 6)
 class Encoder(nn.Module):
     def __init__(self, embed_dim, hidden_dim, RNNlayers):
         super().__init__()
@@ -172,6 +172,7 @@ class TrainingTranslator(nn.Module):
 class Decoder(TrainingDecoder):
     def __init__(self, embed_dim, hidden_dim):
         super().__init__(embed_dim, hidden_dim)
+
     def forward(self,context, tgt_tokens=None, max_tokens=10):
       if self.training:
         return super().forward(context, tgt_tokens)  # IMPL-NOTE: tgt_tokens used to calc loss only
@@ -196,6 +197,7 @@ class Translator(nn.Module):
         super().__init__()
         self.encoder = Encoder(embed_dim, hidden_dim, encoder_layers)
         self.decoder = Decoder(embed_dim, hidden_dim)
+
       def forward(self,src_tokens, tgt_tokens=None, corrupted_src_tokens=None):
         # 1. get Context from Encoder
         if corrupted_src_tokens != None:
@@ -229,7 +231,8 @@ def iterate_one_pair_DAE(src_tokens, tgt_tokens, corrupted_src_tokens):
     return loss.detach(), hits
 
 sparsity_factor = 1.2  # increase in hidden state for sparsity
-model     = Translator(50, int(50 * sparsity_factor), 2)
+model_hidden_dim = int(50 * sparsity_factor)
+model     = Translator(50, model_hidden_dim, 2)
 optimizer = torch.optim.AdamW(model.parameters())
 
 print("-------------------------------------")
@@ -245,7 +248,7 @@ def get_corrupted_src_tokens(src_tokens):
     return corrupted_src_tokens
 
 #overfit a small batch to check if learning _can_ occur
-num_samples, epochs = 10, 100
+num_samples, epochs = 10, 10
 for epoch in range(epochs):
   batch_loss_agg = torch.tensor([0.])
   hits = 0
@@ -256,7 +259,7 @@ for epoch in range(epochs):
     hits += hit
     batch_loss_agg += loss
   epoch_loss = batch_loss_agg / num_samples
-  if epoch % 10 == 0:
+  if epoch % 2 == 0:
     print("Epoch", epoch, " loss:", epoch_loss.item(), " Hits: ", hits / num_samples)
 
 print("-------------------------------------")
@@ -297,4 +300,108 @@ with torch.no_grad():
     same_len, acc = calc_accuracy(predicted_itos, ground_truth)
     print(f"predicted: {predicted_itos}, ground_truth: {ground_truth}, [len: {same_len}, acc: {acc}]")
 
+
+print("-------------------------------------")
+print("apply transfer learning on sentiment classification")
+print("-------------------------------------")
+
+# -----------------------------------------------
+# 2.F
+# the model was already trained on text dataset, tatoeba. for translation. specifically, the Encoder is trained.
+# replace the Decoder with ClassificationHead for sentiment analysis
+# train the new Head only, on Glue\SST2
+# -----------------------------------------------
+
+class ClassificationHead(nn.Module):
+    def __init__(self, in_features):
+        super().__init__()
+        self.linear = nn.Linear(in_features, 2)  # output 2 options
+        self.logsoftmax = nn.LogSoftmax(dim=0)  # TODO: FasterDeepRNNClassifier used LogSoftmax. still, maybe use Sigmoid as in p169.py.
+
+    def forward(self, feature_extractor_output_context, ignored_tgt_tokens=None):  # ignore the tgt_tokens which Translator passes to Decoder(TrainingDecoder)
+        class_scores = self.linear(feature_extractor_output_context)
+        logprobs = self.logsoftmax(class_scores)
+        return logprobs
+
+# class SentimentTranslator(Translator):
+#     def __init__(self, embed_dim, hidden_dim, encoder_layers):
+#         super().__init__()
+#         self.decoder = sentiment_fc
+#
+#     def forward(self, X):
+#         latent_encoding = super.encoder(X)
+#         predictions = self.decoder(latent_encoding)
+#         return predictions
+
+
+sentiment_fc = ClassificationHead(model_hidden_dim)
+optimizer = torch.optim.AdamW(sentiment_fc.parameters())  # NOTE: training the ClassificationHead only
+#model = Translator(50, int(50 * sparsity_factor), 2)
+model.decoder = sentiment_fc
+print("updated pre-trained Translator: ", model)
+# optimizer = torch.optim.SGD(sentiment_fc.parameters(), lr=0.1)
+# ce_loss = nn.NLLLoss()
+
+
+def iterate_sentence_sentiment(src_tokens, sentiment_label, train_flag=True):
+    if train_flag:
+        model.train()
+        optimizer.zero_grad()
+        predictions = model(src_tokens, tgt_tokens)
+        loss = -predictions[sentiment_label]  # Cross Entropy
+        # TODO: loss = ce_loss(predictions.view(1), Ys)
+        loss.backward()
+        optimizer.step()
+    else:
+        model.eval()
+        predictions = model(src_tokens)
+        model.train()
+    with torch.no_grad():
+        predicted_labels = predictions.argmax()
+        success = (predicted_labels == sentiment_label)
+    return success
+
+
+sst2_dataset = ds.load_dataset("glue", "sst2")
+
+sst2_sentence_list = sst2_dataset["train"]["sentence"]
+sst2_labels_list = sst2_dataset["train"]["label"]
+
+sst2_tokenized = list(map(lambda x: x.split(), sst2_sentence_list))
+
+sst2_vocab = build_vocab_from_iterator(sst2_tokenized, specials=["<UNK>"], min_freq=5)
+sst2_vocab.set_default_index(0)
+
+sst2_integer_tokens = list(map(lambda x: torch.tensor(sst2_vocab(x)), sst2_tokenized))
+sst2_label_tensors = list(map(torch.tensor, sst2_labels_list))
+print("sst2_sentence_list", *sst2_sentence_list[1:4], sep="\n")
+print("sst2_integer_tokens", *sst2_integer_tokens[1:4], sep="\n")
+print("sst2_label_tensors", *sst2_label_tensors[1:4], sep="\n")
+
+sst2_test_split = len(sst2_integer_tokens) * 8//10
+sst2_train_tokens = sst2_integer_tokens[:sst2_test_split]
+sst2_train_labels = sst2_label_tensors[:sst2_test_split]
+sst2_test_tokens = sst2_integer_tokens[sst2_test_split:]
+sst2_test_labels = sst2_label_tensors[sst2_test_split:]
+
+src_tokens = sst2_train_tokens
+sentiment_labels = sst2_train_labels
+
+num_samples, epochs = 10, 10
+for epoch in range(epochs):
+  batch_loss_agg = torch.tensor([0.])
+  hits = 0
+  for idx in range(num_samples):
+    # run model on a sentence and translation - Integer tokens of src_sents[idx], tgt_sents[idx]
+    hit = iterate_sentence_sentiment(src_tokens[idx], sentiment_labels[idx], True)
+    hits += hit
+    batch_loss_agg += loss
+  epoch_loss = batch_loss_agg / num_samples
+  if epoch % 2 == 0:
+    print("Epoch", epoch, " loss:", epoch_loss.item(), " Hits: ", hits / num_samples)
+
+print("-------------------------------------")
+print("transfer learning eval")
+print("-------------------------------------")
+# TODO: ...
 
