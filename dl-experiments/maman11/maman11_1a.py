@@ -52,7 +52,7 @@ def expand_as_impl(A, B):
     for i, dt in enumerate(list(s_b)):
         da = Ae.shape[i]
         if(dt > da):
-            l = [Ae] * dt  # da is 1
+            l = [Ae] * dt  # da is 1. list trick, same as ['a', 'b'] * 3 = ['a', 'b', 'a', 'b', 'a', 'b']
             Ae = torch.cat(l, dim=i)
 
     return Ae
@@ -136,15 +136,23 @@ print(ret.shape)
 
 x = torch.tensor([3, 3])  # vs x = torch.empty(3, 3) === x2 = torch.tensor([[3,3,3],[3,3,3],[3,3,3]])
 y = torch.tensor([2])  # vs y = torch.empty(2)
+passed_1st_stage = False
 try:
-    x.expand_as(y)
+    y.expand_as(x)  # should pass
+    passed_1st_stage = True
+    x.expand_as(y)  # should fail
 except Exception as e:
+    assert passed_1st_stage, "expected to pass first variant"
     print("threw error as expected: ", e)
 
+passed_1st_stage = False
 try:
-    ret = expand_as_impl(x, y)
+    ret = expand_as_impl(y, x)  # should pass
+    passed_1st_stage = True
+    ret = expand_as_impl(x, y)  # should fail
     print("error: ", ret.shape)
 except Exception as e:
+    assert passed_1st_stage, "expected to pass first variant"
     print("threw error as expected: ", e)
 
 
