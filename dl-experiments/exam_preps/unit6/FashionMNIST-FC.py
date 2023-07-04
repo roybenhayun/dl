@@ -83,10 +83,14 @@ def train_and_test_fashion_mnist_nn(num_epochs=1):
     train_set_loss = torch.zeros(num_epochs)
     train_set_acc = torch.zeros(num_epochs)
 
+    # Page 116, Q 1, 2
+    #image_mask = torch.rand(28, 28) > 0.5
+
     for epoch in range(num_epochs):
         print(f"Epoch: {epoch}")
         for batch_idx, (features, labels) in tqdm(enumerate(train_dataloader)):
             features = features.type(torch.float)  # change type to float
+            #features = features * image_mask
             batch_loss[epoch, batch_idx], batch_acc[epoch, batch_idx], _ = iterate_batch(features, labels, model,
                                                                                          optimizer, ce_loss)
         train_set_loss[epoch] = float(np.average(batch_loss))
@@ -98,9 +102,9 @@ def train_and_test_fashion_mnist_nn(num_epochs=1):
           f"total avg acc: {round(float(np.average(train_set_acc)), 3)}")
 
     render_accuracy_plot("Batch", batches, batch_loss[0, :], batch_acc[0, :],
-                         f"Fashion-MNIST: *1st* Epoch per batch (batch size: {batch_size}, nn: {module_names})")
+                         f"Fashion-MNIST: *1st* Epoch per batch (batch size: {batch_size}")
     render_accuracy_plot("Epoch", num_epochs, train_set_loss, train_set_acc,
-                         f"Fashion-MNIST: {num_epochs} epochs (batch size: {batch_size}, nn: {module_names})")
+                         f"Fashion-MNIST: {num_epochs} epochs (batch size: {batch_size}")
 
     #
     # eval with test data
@@ -124,6 +128,9 @@ def train_and_test_fashion_mnist_nn(num_epochs=1):
         for batch_idx, (features, labels) in tqdm(enumerate(test_dataloader), unit="batch"):
             # change type to float (needed in forward pass)
             features = features.type(torch.float)
+
+            # features = features * image_mask
+
             test_set_loss[batch_idx], test_set_acc[batch_idx], predicted = iterate_batch(features, labels, model, optimizer, ce_loss)
             total_acc += predicted
 
@@ -131,10 +138,10 @@ def train_and_test_fashion_mnist_nn(num_epochs=1):
     print(f"avg acc: {round(float(np.average(test_set_acc)), 3)}")
     print(f"total accuracy: {total_acc} / {samples_num} = {round(total_acc.item() / samples_num, 3)}")
     render_accuracy_plot("Batch", test_batches, test_set_loss, test_set_acc,
-                         f"Fashion-MNIST test set (ACC: {round(total_acc.item() / samples_num, 3)}, nn: {module_names})")
+                         f"Fashion-MNIST test set (ACC: {round(total_acc.item() / samples_num, 3)}")
 
 
 if __name__ == '__main__':
     print("Fashion-MNIST plain vanilla")
-    train_and_test_fashion_mnist_nn(num_epochs=3)
+    train_and_test_fashion_mnist_nn(num_epochs=10)
 
