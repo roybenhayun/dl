@@ -42,9 +42,9 @@ class EmbedSumClassify(nn.Module):
 if __name__ == '__main__':
     print("maman 16 ex 1")
     dataset = ds.load_dataset("glue", "sst2")
-    pprint(dataset)
-    pprint(dataset["train"])
-    pprint(dataset["train"][1:3])
+    print(dataset)
+    print(dataset["train"])
+    print(dataset["train"][1:3])
 
     sentence_list = dataset["train"]["sentence"]
     labels_list = dataset["train"]["label"]
@@ -65,8 +65,8 @@ if __name__ == '__main__':
 
     print(vocab.get_itos()[0:10])
 
-    pprint(f"labels_list: {labels_list[1:3]}")
-    pprint(sentence_list[1:3])
+    print(f"labels_list: {labels_list[1:3]}")
+    print(sentence_list[1:3])
     print(*tokenized[1:3], sep="\n")
 
     vocab = build_vocab_from_iterator(tokenized, specials=["<UNK>"], min_freq=5)
