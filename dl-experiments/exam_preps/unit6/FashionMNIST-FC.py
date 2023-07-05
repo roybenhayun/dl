@@ -89,7 +89,7 @@ def train_and_test_fashion_mnist_nn(num_epochs=1):
     for epoch in range(num_epochs):
         print(f"Epoch: {epoch}")
         for batch_idx, (features, labels) in tqdm(enumerate(train_dataloader)):
-            features = features.type(torch.float)  # change type to float
+            features = features.type(torch.float)  # from byte [0,1] to float
             #features = features * image_mask
             batch_loss[epoch, batch_idx], batch_acc[epoch, batch_idx], _ = iterate_batch(features, labels, model,
                                                                                          optimizer, ce_loss)
@@ -127,7 +127,7 @@ def train_and_test_fashion_mnist_nn(num_epochs=1):
     with torch.no_grad():
         for batch_idx, (features, labels) in tqdm(enumerate(test_dataloader), unit="batch"):
             # change type to float (needed in forward pass)
-            features = features.type(torch.float)
+            features = features.type(torch.float)  # from byte to float
 
             # features = features * image_mask
 
