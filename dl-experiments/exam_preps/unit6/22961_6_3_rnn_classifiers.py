@@ -20,6 +20,7 @@ from matplotlib import pyplot as plt
 dataset = ds.load_dataset("glue", "sst2")
 
 sentence_list = dataset["train"]["sentence"]
+print(f"sentences num in dataset: {len(sentence_list)}")
 labels_list   = dataset["train"]["label"]
 tokenize      = lambda x: x.split()
 tokenized     = list(map(tokenize, sentence_list))
@@ -37,8 +38,10 @@ print(*label_tensors[1:3], sep="\n")
 
 test_split   = len(integer_tokens) * 8//10
 train_tokens = integer_tokens[:test_split]
+print(f"sentences num in train dataset: {len(train_tokens)}")
 train_labels = label_tensors[:test_split]
 test_tokens  = integer_tokens[test_split:]
+print(f"sentences num in test dataset: {len(test_tokens)}")
 test_labels  = label_tensors[test_split:]
 
 tanh = nn.Tanh()
@@ -153,8 +156,11 @@ def iterate_one_sentence(tokens, label, train_flag):
     success = (predicted_labels == label)
   return success
 
+print(f"*** TRAIN ***")
+print(f"sentences num in train dataset: {len(train_tokens)}")
 #overfit a small batch to check if learning _can_ occur
-num_samples, epochs = 100, 10
+num_samples, epochs = len(train_tokens), 2
+print(f"num_samples: {num_samples}, epochs: {epochs}")
 parameters = list(model.parameters())
 avg_grad_norms = torch.zeros(epochs)
 for epoch in range(epochs):
@@ -177,17 +183,20 @@ plt.xlabel("Epoch")
 plt.title("Average Inf Norm");
 plt.show()
 
+print(f"*** EVAL ***")
+print(f"sentences num in test dataset: {len(test_tokens)}")
 test_correct_predictions = torch.tensor([0.])
 for tokens, label in tqdm(zip(test_tokens, test_labels), total=len(test_tokens)):
   test_correct_predictions += iterate_one_sentence(tokens, label, train_flag=False)
 test_acc = test_correct_predictions / len(test_tokens)
 
-print(f"acc: {acc}, test_acc: {test_acc}")
+print(f"train acc: {acc}, test acc: {test_acc}")
 
 preprocess = lambda x: torch.tensor(vocab(x.split()))
 example_sentences=["very good , not bad",
                    "very bad , not good"]
 with torch.no_grad():
   for sent in example_sentences:
-    print(preprocess(sent))
-    print(torch.exp(model(preprocess(sent))))
+      print(f"sentence: {sent}")
+      print(f"preprocess: {preprocess(sent)}")
+      print(f"exp(model(preprocess)): {torch.exp(model(preprocess(sent)))}")
