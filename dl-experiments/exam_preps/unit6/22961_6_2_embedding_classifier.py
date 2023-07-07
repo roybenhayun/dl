@@ -72,13 +72,21 @@ features = extractor(tokens)
 print(features, features.size(), sep="\n")
 
 class FeatureExtractor(nn.Module):
-    def __init__(self, embed_dim):
+    def __init__(self, embed_dim, use_bag=False):
         super().__init__()
-        self.embedding = nn.Embedding(len(vocab), embed_dim)
+        self.use_bag = use_bag
+        if not use_bag:
+            self.embedding = nn.Embedding(len(vocab), embed_dim)
+        else:
+            self.embedding = nn.EmbeddingBag(len(vocab), embed_dim)
 
     def forward(self, sentence_tokens):
-        embedded    = self.embedding(sentence_tokens)
-        feature_extractor_output = embedded.sum(dim=0)    #
+        if not self.use_bag:
+            embedded = self.embedding(sentence_tokens)
+            feature_extractor_output = embedded.sum(dim=0)    #
+        else:
+            sentence_tokens = sentence_tokens.unsqueeze(0)
+            feature_extractor_output = self.embedding(sentence_tokens).squeeze()
         return feature_extractor_output
 
 extractor = FeatureExtractor(2)
@@ -97,6 +105,9 @@ class EmbedSumClassify(nn.Module):
         return logprobs
 
 model = EmbedSumClassify(2)
+print(model(tokens))
+
+model = EmbedSumClassify(12)
 print(model(tokens))
 
 def iterate_one_sentence(tokens, label, train_flag):
