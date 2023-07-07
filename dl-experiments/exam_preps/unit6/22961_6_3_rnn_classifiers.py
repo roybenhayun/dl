@@ -114,7 +114,7 @@ class FasterDeepRNNClassifier(nn.Module):
     def __init__(self, embed_dim, hidden_dim, RNNlayers):
         super().__init__()
         self.hidden_dim = hidden_dim
-        self.embedding  = nn.Embedding(len(vocab), embed_dim)
+        self.embedding  = nn.Embedding(len(vocab), embed_dim)  # self.embedding.weight.shape = [11222, 10] - many parameters
         self.rnn_stack  = nn.RNN(embed_dim,                   #
                                  hidden_dim,
                                  RNNlayers)
@@ -122,11 +122,11 @@ class FasterDeepRNNClassifier(nn.Module):
         self.logsoftmax = nn.LogSoftmax(dim=0)
 
     def forward(self, sentence_tokens):
-      all_embeddings         = self.embedding(sentence_tokens)
-      all_embeddings         = all_embeddings.unsqueeze(1)
-      hidden_state_history, _= self.rnn_stack(all_embeddings)
+      all_embeddings         = self.embedding(sentence_tokens)  # size = [sentence length, embed_dim]
+      all_embeddings         = all_embeddings.unsqueeze(1)      # add pseudo batch dimenstion. now size = [sentence length, 1, embed_dim]
+      hidden_state_history, _= self.rnn_stack(all_embeddings)   # per t, return the last cell's hidden state. size = [times, batch, hidden_dim]
 
-      feature_extractor_output = hidden_state_history[-1,0,:]
+      feature_extractor_output = hidden_state_history[-1,0,:]   # [hidden_dim] <= [-1,0,:] means last hidden state of the last RNN cell  == [last time, only batch, all hidden state].
       class_scores     = self.linear(feature_extractor_output)
       logprobs         = self.logsoftmax(class_scores)
       return logprobs
@@ -170,7 +170,7 @@ for epoch in range(epochs):
     correct_predictions += iterate_one_sentence(train_tokens[idx],
                                                 train_labels[idx],
                                                 train_flag=True)
-    norms = [p.grad.detach().abs().max() for p in parameters if p.grad is not None]
+    norms = [p.grad.detach().abs().max() for p in parameters if p.grad is not None]  # good tool to identify
     grad_norm_temp[idx] = torch.max(torch.stack(norms))
   avg_grad_norms[epoch] = grad_norm_temp.mean()
 
